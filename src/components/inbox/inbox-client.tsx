@@ -26,6 +26,8 @@ import { citaDe } from "./helpers";
 import { marcarBandejaMontada, publicarLista, unaALaVez } from "@/lib/lista-compartida";
 import { ContactPanel } from "./contact-panel";
 import { IaRapida } from "./ia-rapida";
+import { AgendarCita } from "./agendar-cita";
+import { AvisoReactivar } from "./aviso-reactivar";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -53,10 +55,16 @@ const isWideEnoughForPanel = () =>
 export function InboxClient({
   channels,
   canDelete = false,
+  agenda = false,
+  avisarAlReactivar = false,
 }: {
   channels: readonly Channel[];
   /** 026 — Eliminar es irreversible: solo quien administra ve la opción. */
   canDelete?: boolean;
+  /** Módulo de la agencia: botón «Agendar» en el encabezado (bandera AGENDA). */
+  agenda?: boolean;
+  /** Módulo de la agencia: aviso editable al reactivar la IA (AVISAR_AL_REACTIVAR_IA). */
+  avisarAlReactivar?: boolean;
 }) {
   const multiChannel = channels.length > 1;
   const [conversations, setConversations] = useState<ConversationDto[] | null>(
@@ -391,6 +399,23 @@ export function InboxClient({
     [refetchConversations]
   );
 
+  // Módulo de la agencia: reactivar la IA con la ventana abierta pasa antes
+  // por la ventana del aviso al cliente (encendido con AVISAR_AL_REACTIVAR_IA).
+  type CambioIa = { aiEnabled?: boolean; reactivate?: boolean };
+  const [avisoPendiente, setAvisoPendiente] = useState<CambioIa | null>(null);
+  const cambiarIa = useCallback(
+    async (patch: CambioIa) => {
+      const conv = conversations?.find((c) => c.id === selectedIdRef.current);
+      const reactiva = patch.reactivate === true || patch.aiEnabled === true;
+      if (avisarAlReactivar && reactiva && conv?.windowOpen) {
+        setAvisoPendiente(patch);
+        return;
+      }
+      await patchConversation(patch);
+    },
+    [avisarAlReactivar, conversations, patchConversation]
+  );
+
   /** 026 — Devuelve el mensaje de error, o null si la conversación ya no existe. */
   const deleteConversation = useCallback(
     async (alsoContact: boolean): Promise<string | null> => {
@@ -466,8 +491,18 @@ export function InboxClient({
                     {/* Módulo de la agencia: la IA de esta conversación, a la mano. */}
                     <IaRapida
                       conversation={selected}
-                      onPatchConversation={patchConversation}
+                      onPatchConversation={cambiarIa}
                     />
+                    {agenda && (
+                      <AgendarCita
+                        conversation={selected}
+                        onDone={() => {
+                          if (selectedIdRef.current)
+                            void refetchMessages(selectedIdRef.current);
+                          void refetchConversations();
+                        }}
+                      />
+                    )}
                   </p>
                   <p
                     className={cn(
@@ -601,13 +636,25 @@ export function InboxClient({
             <ContactPanel
               conversation={selected}
               refreshKey={detailRev}
-              onPatchConversation={patchConversation}
+              onPatchConversation={cambiarIa}
               onDeleteConversation={canDelete ? deleteConversation : undefined}
               onClose={() => togglePanel(false)}
             />
           </div>
         )}
       </section>
+
+      {avisoPendiente && selected && (
+        <AvisoReactivar
+          conversation={selected}
+          onCancel={() => setAvisoPendiente(null)}
+          onAvisoEnviado={() => void refetchMessages(selected.id)}
+          onReactivar={async () => {
+            await patchConversation(avisoPendiente);
+            setAvisoPendiente(null);
+          }}
+        />
+      )}
     </div>
   );
 }
