@@ -25,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { GUIA_DEL_PAR_URL } from "@/lib/guia-del-par";
+import { ClientesALaMedida } from "./clientes-a-la-medida";
 
 type Run = {
   id: string;
@@ -59,7 +60,12 @@ const TIPO_LABELS: Record<Hallazgo["tipo"], string> = {
   tono: "Tono",
 };
 
-export function LabClient() {
+export function LabClient({
+  aLaMedida = false,
+}: {
+  /** Módulo de la agencia: clientes de prueba del negocio (LAB_A_LA_MEDIDA). */
+  aLaMedida?: boolean;
+} = {}) {
   const [runs, setRuns] = useState<Run[]>([]);
   const [aiConfigured, setAiConfigured] = useState(true);
   // 036 — El Laboratorio prueba al agente conectado; sin él no hay a quién.
@@ -217,6 +223,8 @@ export function LabClient() {
           </div>
         </div>
       )}
+
+      {aLaMedida && <ClientesALaMedida deshabilitado={!aiConfigured} />}
 
       <div className="grid gap-4 p-4 sm:gap-6 sm:p-6 lg:grid-cols-[280px_1fr]">
         <HistoryList

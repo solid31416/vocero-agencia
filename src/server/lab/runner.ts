@@ -11,6 +11,10 @@ import { iniciarWorker, programarTanda } from "@/server/dispatch/worker";
 import { computeScore, judgeCase } from "@/server/lab/judge";
 import { PERSONAS, type Persona } from "@/server/lab/personas";
 import { rolDe } from "@/lib/agent-roles";
+import { esClientePropio } from "@/lib/lab-a-la-medida";
+import { labALaMedidaEnabled } from "@/server/lab/a-la-medida/flag";
+import { clientesDelRol, personaDeCliente } from "@/server/lab/a-la-medida/corrida";
+import { clientesParaCorrida, listarClientes } from "@/server/lab/a-la-medida/store";
 
 /**
  * Runner del Laboratorio (FR-030/FR-034): corrida en segundo plano DENTRO del
@@ -68,12 +72,23 @@ export async function startRun(organizationId: string): Promise<string> {
     .limit(1);
   const delRol = personasDelRol(perfil?.role);
 
+  // Módulo de la agencia (LAB_A_LA_MEDIDA): los clientes de ESTE negocio, si
+  // los tiene y los quiere usar; si no, los de fábrica. Un fallo leyéndolos
+  // no tumba la corrida: se corre con los de fábrica.
+  const propios = labALaMedidaEnabled()
+    ? clientesDelRol(
+        (await clientesParaCorrida(organizationId).catch(() => null)) ?? [],
+        rolDe(perfil?.role).personas
+      )
+    : [];
+  const claves = propios.length ? propios.map((c) => c.id) : delRol.map((p) => p.key);
+
   await db.insert(schema.agentTestCase).values(
-    delRol.map((p) => ({
+    claves.map((clave) => ({
       id: newId("testCase"),
       organizationId,
       runId,
-      persona: p.key,
+      persona: clave,
       status: "pending" as const,
     }))
   );
@@ -150,8 +165,15 @@ async function runAllCases(
   publishProgress(organizationId, runId, "running", done, total);
   const fallas: string[] = [];
 
+  // Módulo de la agencia: los clientes propios de esta corrida, por su id.
+  const propios = cases.some((c) => esClientePropio(c.persona))
+    ? (await listarClientes(organizationId)).map(personaDeCliente)
+    : [];
+
   for (const testCase of cases) {
-    const persona = PERSONAS.find((p) => p.key === testCase.persona);
+    const persona =
+      PERSONAS.find((p) => p.key === testCase.persona) ??
+      propios.find((p) => p.key === testCase.persona);
     if (!persona) continue;
 
     await db
@@ -179,7 +201,8 @@ async function runAllCases(
 
     const outcome = await judgeCase({
       organizationId,
-      personaKey: persona.key,
+      // Un cliente propio se le presenta al juez por su tipo (lo que prueba).
+      personaKey: esClientePropio(persona.key) ? persona.description : persona.key,
       transcript,
       kbText,
       behaviorText,

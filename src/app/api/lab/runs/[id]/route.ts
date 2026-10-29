@@ -3,6 +3,8 @@ import { apiError, withAuth } from "@/lib/api";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { PERSONA_LABELS } from "@/server/lab/personas";
+import { esClientePropio } from "@/lib/lab-a-la-medida";
+import { listarClientes } from "@/server/lab/a-la-medida/store";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +33,18 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     .where(eq(schema.agentTestCase.runId, id))
     .orderBy(asc(schema.agentTestCase.createdAt));
 
+  // Módulo de la agencia: el nombre de los clientes propios. Si ya se borró
+  // o se cambió, la corrida vieja dice que era uno a la medida.
+  const nombres = new Map<string, string>();
+  if (cases.some((c) => esClientePropio(c.persona))) {
+    const propios = await listarClientes(session.organizationId).catch(() => []);
+    for (const c of propios) nombres.set(c.id, c.nombre);
+  }
+  const etiqueta = (clave: string) =>
+    PERSONA_LABELS[clave] ??
+    nombres.get(clave) ??
+    (esClientePropio(clave) ? "Cliente a la medida (ya no existe)" : clave);
+
   return Response.json({
     run: {
       id: run.id,
@@ -43,7 +57,7 @@ export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
     cases: cases.map((c) => ({
       id: c.id,
       persona: c.persona,
-      personaLabel: PERSONA_LABELS[c.persona] ?? c.persona,
+      personaLabel: etiqueta(c.persona),
       status: c.status,
       veredicto: c.veredicto,
       hallazgos: c.hallazgos ?? [],

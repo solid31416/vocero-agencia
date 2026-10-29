@@ -52,6 +52,10 @@ export const envSchema = z.object({
   // bandeja ofrece mandarle al cliente un aviso editable. Apagado por defecto. Ej.:
   // AVISAR_AL_REACTIVAR_IA=on
   AVISAR_AL_REACTIVAR_IA: z.string().optional(),
+  // Módulo de la agencia: el Laboratorio usa clientes de prueba del negocio,
+  // escritos por la IA desde el perfil y el conocimiento del agente (editables).
+  // Apagado por defecto. Ej.: LAB_A_LA_MEDIDA=on
+  LAB_A_LA_MEDIDA: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),
