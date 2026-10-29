@@ -4,6 +4,7 @@ import { getConversation } from "@/server/inbox/queries";
 import { ForwardImageError } from "@/server/inbox/forward-image";
 import { forwardMessage } from "@/server/inbox/forward-message";
 import { SendError } from "@/server/inbox/send";
+import { pausarIaPorHumano } from "@/server/inbox/pausa-por-humano";
 import { MediaValidationError } from "@/server/whatsapp/media";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,9 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
       conversationId: id,
       ...body.data,
     });
+    // Módulo de la agencia: escribió una persona → la IA de esta conversación
+    // se pausa (con PAUSAR_IA_AL_RESPONDER=on).
+    await pausarIaPorHumano(session.organizationId, id);
     return Response.json({ messageId: result.messageId }, { status: 201 });
   } catch (err) {
     if (err instanceof ForwardImageError) return apiError(err.status, err.code, err.message);

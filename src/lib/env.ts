@@ -38,6 +38,11 @@ export const envSchema = z.object({
   // conversacion, no se le reporta nada a Meta y la superficie da 404.
   // Ej.: ATRIBUCION=on
   ATRIBUCION: z.string().optional(),
+  // Módulo de la agencia: pausa la IA de una conversación cuando una persona
+  // le escribe desde la bandeja (texto, adjunto, plantilla o reenvío), para
+  // que el cerebro no conteste encima. Apagado por defecto. Ej.:
+  // PAUSAR_IA_AL_RESPONDER=on
+  PAUSAR_IA_AL_RESPONDER: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

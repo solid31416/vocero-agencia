@@ -8,6 +8,7 @@ import { getConversation, listMessages } from "@/server/inbox/queries";
 import { serializeMessage } from "@/server/inbox/ingest";
 import { resolverCitas } from "@/server/inbox/quotes";
 import { SendError, sendStructured, sendText } from "@/server/inbox/send";
+import { pausarIaPorHumano } from "@/server/inbox/pausa-por-humano";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,9 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
               contacts: data.contacts,
               replyToMessageId: data.replyToMessageId,
             });
+    // Módulo de la agencia: escribió una persona → la IA de esta conversación
+    // se pausa (con PAUSAR_IA_AL_RESPONDER=on).
+    await pausarIaPorHumano(session.organizationId, id);
     return Response.json({ messageId: result.messageId });
   } catch (err) {
     if (err instanceof SendError) {

@@ -1,6 +1,7 @@
 import { apiError, withAuth } from "@/lib/api";
 import { getConversation } from "@/server/inbox/queries";
 import { SendError, sendMediaMessage } from "@/server/inbox/send";
+import { pausarIaPorHumano } from "@/server/inbox/pausa-por-humano";
 import { MediaValidationError } from "@/server/whatsapp/media";
 
 export const dynamic = "force-dynamic";
@@ -70,6 +71,9 @@ export const POST = withAuth(async (session, req: Request, ctx: Params) => {
       replyToMessageId,
       voz,
     });
+    // Módulo de la agencia: escribió una persona → la IA de esta conversación
+    // se pausa (con PAUSAR_IA_AL_RESPONDER=on).
+    await pausarIaPorHumano(session.organizationId, id);
     return Response.json({ messageId: result.messageId }, { status: 201 });
   } catch (err) {
     if (err instanceof MediaValidationError) {
