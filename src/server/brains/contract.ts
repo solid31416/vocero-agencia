@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import type { MensajeAlDia } from "@/server/brains/ponerse-al-dia";
 
 /**
  * 021 — El contrato del despacho: lo que el CRM le manda a un cerebro externo
@@ -76,6 +77,13 @@ export type EventoDespacho = {
   messages: MensajeDelEvento[];
   firstMessageAt: string;
   lastMessageAt: string;
+  /**
+   * Módulo de la agencia — Lo que pasó desde la última respuesta del agente y
+   * no viaja en `messages` (la persona del equipo que contestó, el cliente
+   * mientras la IA estaba en pausa). Solo con `PONER_AL_DIA_AL_AGENTE` y si
+   * hay algo; siempre al final.
+   */
+  ponerseAlDia?: MensajeAlDia[];
 };
 
 /** Lo que hace falta saber de un mensaje para meterlo al evento. */
@@ -117,6 +125,8 @@ export function armarEvento(datos: {
   messages: MensajeParaEvento[];
   firstMessageAt: Date;
   lastMessageAt: Date;
+  /** Módulo de la agencia. */
+  ponerseAlDia?: MensajeAlDia[];
 }): EventoDespacho {
   return {
     dispatchId: datos.dispatchId,
@@ -141,6 +151,9 @@ export function armarEvento(datos: {
     messages: datos.messages.map(mensajeDelEvento),
     firstMessageAt: datos.firstMessageAt.toISOString(),
     lastMessageAt: datos.lastMessageAt.toISOString(),
+    // Módulo de la agencia — Solo cuando hay algo, al final: el cuerpo gemelo
+    // no cambia.
+    ...(datos.ponerseAlDia?.length ? { ponerseAlDia: datos.ponerseAlDia } : {}),
   };
 }
 

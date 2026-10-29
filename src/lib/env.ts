@@ -43,6 +43,11 @@ export const envSchema = z.object({
   // que el cerebro no conteste encima. Apagado por defecto. Ej.:
   // PAUSAR_IA_AL_RESPONDER=on
   PAUSAR_IA_AL_RESPONDER: z.string().optional(),
+  // Módulo de la agencia: el despacho lleva además `ponerseAlDia`, lo que pasó
+  // desde la última respuesta del agente (lo que escribió el equipo y lo que
+  // dijo el cliente con la IA en pausa). Apagado por defecto. Ej.:
+  // PONER_AL_DIA_AL_AGENTE=on
+  PONER_AL_DIA_AL_AGENTE: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

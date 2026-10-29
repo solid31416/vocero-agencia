@@ -15,6 +15,7 @@ import {
   type ResultadoEntrega,
 } from "@/server/brains/contract";
 import { leerConfigDespacho } from "@/server/brains/config";
+import { ponerAlDiaEnabled, ponerseAlDiaDe } from "@/server/brains/ponerse-al-dia";
 import type { FilaDespacho } from "@/server/dispatch/outbox";
 import { isWindowOpen, windowExpiresAt } from "@/server/inbox/window";
 import { windowMsFor } from "@/server/channels/capabilities";
@@ -243,6 +244,23 @@ export async function construirEvento(
     fila.messageIds ?? []
   );
 
+  // Módulo de la agencia: lo que pasó mientras el agente no habló (una
+  // persona contestó, la IA estaba en pausa). Solo con la bandera, y un fallo
+  // aquí jamás tumba el despacho: se manda sin ponerse al día.
+  const ponerseAlDia = ponerAlDiaEnabled()
+    ? await ponerseAlDiaDe(
+        fila.organizationId,
+        conv.id,
+        messages.map((m) => m.id)
+      ).catch((err: unknown) => {
+        console.error(
+          "[ponerse-al-dia] no pude leer el mientras tanto:",
+          err instanceof Error ? err.message : err
+        );
+        return [];
+      })
+    : [];
+
   return armarEvento({
     dispatchId: fila.id,
     organization: org,
@@ -270,6 +288,7 @@ export async function construirEvento(
     messages,
     firstMessageAt: fila.firstMessageAt,
     lastMessageAt: fila.lastMessageAt,
+    ponerseAlDia,
   });
 }
 
