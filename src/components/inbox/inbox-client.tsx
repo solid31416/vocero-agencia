@@ -25,6 +25,7 @@ import {
 import { citaDe } from "./helpers";
 import { marcarBandejaMontada, publicarLista, unaALaVez } from "@/lib/lista-compartida";
 import { ContactPanel } from "./contact-panel";
+import { IaRapida } from "./ia-rapida";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -462,6 +463,11 @@ export function InboxClient({
                   <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-bold leading-tight tracking-tight lg:text-[18px] lg:font-semibold">
                     {multiChannel && <ChannelBadge channel={selected.channel} />}
                     <span className="truncate">{selected.contact.name}</span>
+                    {/* Módulo de la agencia: la IA de esta conversación, a la mano. */}
+                    <IaRapida
+                      conversation={selected}
+                      onPatchConversation={patchConversation}
+                    />
                   </p>
                   <p
                     className={cn(
