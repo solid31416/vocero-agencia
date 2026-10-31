@@ -64,6 +64,7 @@ export const MOTIVO_TEXTO: Record<string, string> = {
   ventana: "Se cerró la ventana de 24 h",
   hostilidad: "El cliente se molestó",
   manual: "Una persona pausó la IA",
+  pedido: "Se pidió desde la bandeja (la IA sigue contestando)",
 };
 
 export function textoMotivo(motivo: string | null | undefined): string {

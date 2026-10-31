@@ -30,13 +30,18 @@ export const POST = withAuth(async (session, _req: Request, ctx: Params) => {
   const { id } = await ctx.params;
   const org = session.organizationId;
   const [conv] = await getDb()
-    .select({ handoffReason: schema.conversation.handoffReason, handoffAt: schema.conversation.handoffAt })
+    .select({
+      handoffReason: schema.conversation.handoffReason,
+      handoffAt: schema.conversation.handoffAt,
+      aiEnabled: schema.conversation.aiEnabled,
+    })
     .from(schema.conversation)
     .where(scoped(schema.conversation.organizationId, org, eq(schema.conversation.id, id)))
     .limit(1);
   if (!conv) return apiError(404, "not_found", "Conversación no encontrada");
 
-  const motivo = conv.handoffAt && conv.handoffReason ? conv.handoffReason : "manual";
+  const motivo =
+    conv.handoffAt && conv.handoffReason ? conv.handoffReason : conv.aiEnabled ? "pedido" : "manual";
   const r = await generarResumen(org, id, motivo, { avisar: false, forzar: true });
   if (!r.ok) {
     const status = r.codigo === "no_existe" ? 404 : r.codigo === "ia_fallo" ? 502 : 409;

@@ -58,6 +58,7 @@ describe("textoMotivo", () => {
   it("dice el motivo para personas, con respaldo", () => {
     expect(textoMotivo("cliente")).toContain("pidió hablar con una persona");
     expect(textoMotivo("manual")).toContain("pausó la IA");
+    expect(textoMotivo("pedido")).toContain("la IA sigue contestando");
     expect(textoMotivo("algo-raro")).toBe("Se pasó a una persona");
     expect(textoMotivo(null)).toBe("Se pasó a una persona");
   });
