@@ -35,6 +35,9 @@ import {
 // Módulo de la agencia — contador de mensajes y costo de Meta.
 import { contadorEnabled } from "@/server/contador-mensajes/flag";
 import { registrarAvisoDeMeta } from "@/server/contador-mensajes/store";
+import { leerBotonCita } from "@/lib/recordatorios";
+import { recordatoriosEnabled } from "@/server/recordatorios/flag";
+import { atenderBotonDeCita } from "@/server/recordatorios/respuestas";
 
 /** Tipos de contenido soportados; el resto se ignora sin error. */
 const SUPPORTED_TYPES = new Set([
@@ -311,7 +314,13 @@ export async function processMessagesValue(value: WebhookValue): Promise<void> {
       );
       continue;
     }
-    await ingestInboundMessage({
+    // Módulo de la agencia: un botón del recordatorio de cita. Confirmo y
+    // Cancelar los atiende el CRM (no van al agente); Reagendar, el agente.
+    const boton = recordatoriosEnabled()
+      ? leerBotonCita(msg.interactive?.button_reply?.id)
+      : null;
+    const guardado = await ingestInboundMessage({
+      despachar: !boton || boton.accion === "reagendar",
       organizationId,
       identity: resolved,
       waMessageId: msg.id,
@@ -324,6 +333,9 @@ export async function processMessagesValue(value: WebhookValue): Promise<void> {
       // de qué forma lo mandó Meta.
       anuncio: anuncioDeWhatsapp(msg.referral),
     });
+    if (boton && guardado) {
+      await atenderBotonDeCita({ organizationId, waMessageId: msg.id, ...guardado, boton });
+    }
   }
 }
 
@@ -466,7 +478,9 @@ export async function ingestInboundMessage(input: {
   threadRef?: string | null;
   /** 016/018: el anuncio que abrió la conversación, ya normalizado por el canal. */
   anuncio?: AnuncioDeOrigen | null;
-}): Promise<void> {
+  /** Módulo de la agencia: false = se guarda pero no se le despacha al agente. */
+  despachar?: boolean;
+}): Promise<{ conversationId: string; contactId: string } | null> {
   const db = getDb();
   const { organizationId } = input;
 
@@ -524,7 +538,7 @@ export async function ingestInboundMessage(input: {
     .onConflictDoNothing({ target: [schema.message.waMessageId] })
     .returning();
   const message = inserted[0];
-  if (!message) return; // duplicado
+  if (!message) return null; // duplicado
 
   const asset = input.media
     ? await attachMediaAsset(organizationId, message.id, input.media)
@@ -560,7 +574,10 @@ export async function ingestInboundMessage(input: {
 
   // 036 — Quien contesta es el cerebro conectado; sin él, una persona. El
   // 025: `message.id` es lo que el despacho le debe al cerebro.
-  if (despachoActivo()) await despacharAlCerebro(conversation.id, organizationId, message.id);
+  if (despachoActivo() && input.despachar !== false) {
+    await despacharAlCerebro(conversation.id, organizationId, message.id);
+  }
+  return { conversationId: conversation.id, contactId: contact.id };
 }
 
 function toDate(timestamp: string): Date {

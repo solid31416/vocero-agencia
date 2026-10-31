@@ -23,8 +23,24 @@ export const TEXTO_POR_DEFECTO =
 export const PLANTILLA_SUGERIDA =
   "Hola {{1}}, te recordamos tu cita el {{2}} a las {{3}}. Si necesitas cambiarla, respóndenos por aquí.";
 
+/** Lo que contesta el CRM cuando el cliente toca un botón del recordatorio. */
+export const TEXTO_CONFIRMO =
+  "¡Gracias por confirmar, {nombre}! Te esperamos el {fecha} a las {hora}.";
+export const TEXTO_CANCELO =
+  "Listo, cancelamos tu cita del {fecha} a las {hora}. Si quieres agendar otra fecha, escríbenos por aquí.";
+export const TEXTO_REAGENDAR =
+  "Claro, {nombre}. En un momento te ayudamos a cambiar tu cita; dinos qué día y hora te acomodan.";
+
+const textoRespuesta = (porDefecto: string) =>
+  z.string().trim().min(1, "Escribe el mensaje").max(MAX_TEXTO).default(porDefecto);
+
 export const configSchema = z.object({
   activo: z.boolean(),
+  /** Dentro de las 24 h, el recordatorio sale con los botones Confirmo / Reagendar / Cancelar. */
+  botones: z.boolean().default(true),
+  textoConfirmo: textoRespuesta(TEXTO_CONFIRMO),
+  textoCancelo: textoRespuesta(TEXTO_CANCELO),
+  textoReagendar: textoRespuesta(TEXTO_REAGENDAR),
   avisos: z
     .array(z.number().int().min(MIN_AVISO_MIN).max(MAX_AVISO_MIN))
     .max(MAX_AVISOS)
@@ -39,7 +55,50 @@ export const CONFIG_POR_DEFECTO: ConfigRecordatorios = {
   avisos: [24 * 60],
   texto: TEXTO_POR_DEFECTO,
   plantillaId: null,
+  botones: true,
+  textoConfirmo: TEXTO_CONFIRMO,
+  textoCancelo: TEXTO_CANCELO,
+  textoReagendar: TEXTO_REAGENDAR,
 };
+
+/* ─────────────── Los botones del recordatorio ─────────────── */
+
+export type AccionCita = "confirmo" | "reagendar" | "cancelo";
+
+/** Los 3 botones, con el texto que ve el cliente (WhatsApp: máximo 20 caracteres). */
+export const BOTONES_CITA: { accion: AccionCita; titulo: string }[] = [
+  { accion: "confirmo", titulo: "Confirmo" },
+  { accion: "reagendar", titulo: "Reagendar" },
+  { accion: "cancelo", titulo: "Cancelar" },
+];
+
+const LETRA: Record<AccionCita, string> = { confirmo: "c", reagendar: "r", cancelo: "x" };
+const PREFIJO_BOTON = "agcita";
+
+/** El id que viaja en el botón y vuelve en la respuesta: «agcita:c:rec_…». */
+export function idBotonCita(accion: AccionCita, envioId: string): string {
+  return `${PREFIJO_BOTON}:${LETRA[accion]}:${envioId}`;
+}
+
+/** Lee el id de un botón de recordatorio; null si no es uno de los nuestros. */
+export function leerBotonCita(id: string | null | undefined): { accion: AccionCita; envioId: string } | null {
+  const m = /^agcita:([crx]):(rec_[a-z0-9]{1,40})$/.exec(id ?? "");
+  if (!m) return null;
+  const accion = (Object.keys(LETRA) as AccionCita[]).find((a) => LETRA[a] === m[1]);
+  return accion ? { accion, envioId: m[2]! } : null;
+}
+
+/** Cómo queda el recordatorio con botones en el hilo de la bandeja (WhatsApp no guarda los botones como texto). */
+export function textoConBotones(cuerpo: string): string {
+  return `${cuerpo}\n\n${BOTONES_CITA.map((b) => `[${b.titulo}]`).join(" · ")}`;
+}
+
+/** Lo que se anota en las notas de la cita cuando el cliente toca un botón. */
+export function notaDeRespuesta(accion: AccionCita, cuando: string): string {
+  const que =
+    accion === "confirmo" ? "✅ Confirmó" : accion === "cancelo" ? "❌ Canceló" : "🔁 Pidió reagendar";
+  return `${que} por WhatsApp (${cuando}).`;
+}
 
 export type EnvioDto = {
   id: string;
@@ -48,6 +107,8 @@ export type EnvioDto = {
   minutos: number;
   estado: "enviando" | "enviado" | "omitido" | "fallido";
   detalle: string | null;
+  /** Lo que contestó el cliente con los botones, si contestó. */
+  respuesta: AccionCita | null;
   creadoEn: string;
 };
 

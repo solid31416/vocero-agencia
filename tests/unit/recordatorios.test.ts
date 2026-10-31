@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  BOTONES_CITA,
   CONFIG_POR_DEFECTO,
+  TEXTO_CONFIRMO,
+  idBotonCita,
+  leerBotonCita,
+  notaDeRespuesta,
+  textoConBotones,
   PLANTILLA_SUGERIDA,
   armarTexto,
   avisosVencidos,
@@ -107,5 +113,57 @@ describe("fechaYHora", () => {
     expect(fecha).toMatch(/viernes/);
     expect(fecha).toMatch(/noviembre/);
     expect(hora).toMatch(/^10:00/);
+  });
+});
+
+describe("botones del recordatorio", () => {
+  it("el id del botón va y vuelve", () => {
+    for (const b of BOTONES_CITA) {
+      const id = idBotonCita(b.accion, "rec_abc123");
+      expect(id.length).toBeLessThanOrEqual(256);
+      expect(leerBotonCita(id)).toEqual({ accion: b.accion, envioId: "rec_abc123" });
+    }
+  });
+
+  it("ignora botones que no son del recordatorio", () => {
+    expect(leerBotonCita(undefined)).toBeNull();
+    expect(leerBotonCita("")).toBeNull();
+    expect(leerBotonCita("Confirmo")).toBeNull();
+    expect(leerBotonCita("agcita:z:rec_abc")).toBeNull();
+    expect(leerBotonCita("agcita:c:ct_abc")).toBeNull();
+    expect(leerBotonCita("agcita:c:rec_abc; drop")).toBeNull();
+  });
+
+  it("los títulos caben en WhatsApp (≤20) y son 3", () => {
+    expect(BOTONES_CITA).toHaveLength(3);
+    for (const b of BOTONES_CITA) expect(b.titulo.length).toBeLessThanOrEqual(20);
+  });
+
+  it("en el hilo queda el texto con los botones escritos", () => {
+    expect(textoConBotones("Hola")).toBe("Hola\n\n[Confirmo] · [Reagendar] · [Cancelar]");
+  });
+
+  it("la nota de la cita dice qué contestó y cuándo", () => {
+    expect(notaDeRespuesta("confirmo", "sábado 31 de octubre, 10:25 a.m.")).toBe(
+      "✅ Confirmó por WhatsApp (sábado 31 de octubre, 10:25 a.m.)."
+    );
+    expect(notaDeRespuesta("cancelo", "x")).toContain("Canceló");
+    expect(notaDeRespuesta("reagendar", "x")).toContain("reagendar");
+  });
+
+  it("una configuración guardada antes de los botones los trae encendidos con sus textos", () => {
+    const vieja = { activo: true, avisos: [60], texto: "Hola {nombre}", plantillaId: null };
+    const r = configSchema.parse(vieja);
+    expect(r.botones).toBe(true);
+    expect(r.textoConfirmo).toBe(TEXTO_CONFIRMO);
+    expect(r.textoCancelo.length).toBeGreaterThan(0);
+    expect(r.textoReagendar.length).toBeGreaterThan(0);
+    expect(configSchema.safeParse({ ...vieja, textoConfirmo: "  " }).success).toBe(false);
+  });
+
+  it("las respuestas rellenan nombre, fecha y hora", () => {
+    expect(
+      armarTexto(TEXTO_CONFIRMO, { nombre: "Ana", fecha: "viernes 6 de noviembre", hora: "10:00 a.m.", enlace: null })
+    ).toBe("¡Gracias por confirmar, Ana! Te esperamos el viernes 6 de noviembre a las 10:00 a.m.");
   });
 });

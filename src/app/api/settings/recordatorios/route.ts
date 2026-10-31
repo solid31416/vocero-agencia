@@ -3,7 +3,7 @@ import { apiError, parseBody, withAuth } from "@/lib/api";
 import { canConfigure } from "@/lib/auth/roles";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
-import { configSchema } from "@/lib/recordatorios";
+import { configSchema, type ConfigRecordatorios } from "@/lib/recordatorios";
 import { countVariables } from "@/server/whatsapp/templates";
 import { recordatoriosEnabled } from "@/server/recordatorios/flag";
 import { guardarConfig, leerConfig, ultimosEnvios } from "@/server/recordatorios/store";
@@ -43,7 +43,8 @@ export const PUT = withAuth(async (session, req: Request) => {
   }
   const body = await parseBody(req, configSchema);
   if (!body.ok) return body.response;
-  const c = body.data;
+  // Con los valores por defecto ya puestos (una pantalla vieja no manda los campos de los botones).
+  const c: ConfigRecordatorios = configSchema.parse(body.data);
   if (c.plantillaId) {
     const [t] = await getDb()
       .select({ id: schema.template.id, body: schema.template.body })

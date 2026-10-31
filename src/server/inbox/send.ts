@@ -748,6 +748,50 @@ export async function sendStructured(
   return { messageId };
 }
 
+/**
+ * Módulo de la agencia — un texto con botones de respuesta rápida (WhatsApp,
+ * máximo 3, título ≤20 caracteres). Solo dentro de la ventana de 24 h, igual
+ * que un texto. En el hilo queda el texto con los botones escritos entre
+ * corchetes (`textoEnHilo`): la bandeja no dibuja los botones.
+ */
+export async function sendBotones(input: {
+  conversationId: string;
+  organizationId: string;
+  cuerpo: string;
+  botones: { id: string; titulo: string }[];
+  textoEnHilo: string;
+}): Promise<SendResult> {
+  const target = await prepareSend(input.conversationId, input.organizationId);
+  if (!target.credentials) {
+    throw new SendError("meta_error", "Este canal no admite botones; manda el texto");
+  }
+  const waMessageId = await callGraphSend(target.credentials, {
+    messaging_product: "whatsapp",
+    ...target.destinatario,
+    type: "interactive",
+    interactive: {
+      type: "button",
+      body: { text: input.cuerpo.slice(0, 1024) },
+      action: {
+        buttons: input.botones.slice(0, 3).map((b) => ({
+          type: "reply",
+          reply: { id: b.id.slice(0, 256), title: b.titulo.slice(0, 20) },
+        })),
+      },
+    },
+  });
+  const messageId = await persistOutbound({
+    organizationId: input.organizationId,
+    conversationId: input.conversationId,
+    waMessageId,
+    type: "text",
+    text: input.textoEnHilo,
+    status: "pending",
+    origin: "operator",
+  });
+  return { messageId };
+}
+
 /** Llama a Graph /messages y traduce errores de Meta a SendError. */
 export async function callGraphSend(
   credentials: Credentials,

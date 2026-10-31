@@ -4,12 +4,15 @@ import { scoped } from "@/lib/db/tenant";
 import {
   armarTexto,
   avisosVencidos,
+  BOTONES_CITA,
   fechaYHora,
+  idBotonCita,
+  textoConBotones,
   primerNombre,
   variablesPlantilla,
   type ConfigRecordatorios,
 } from "@/lib/recordatorios";
-import { sendText, SendError } from "@/server/inbox/send";
+import { sendBotones, sendText, SendError } from "@/server/inbox/send";
 import { sendTemplate } from "@/server/whatsapp/templates";
 import { recordatoriosEnabled } from "./flag";
 import { apartarEnvio, cerrarEnvio, configsActivas } from "./store";
@@ -110,7 +113,7 @@ async function revisarOrganizacion(
         contacto: contacto ?? "",
       });
       if (!id) continue; // ya salió (o lo está mandando otra pasada)
-      const r = await mandar(organizationId, config, booking, contacto, zona);
+      const r = await mandar(organizationId, config, booking, contacto, zona, id);
       await cerrarEnvio(id, r.estado, r.detalle);
       if (r.estado === "enviado") enviados += 1;
     }
@@ -123,7 +126,8 @@ async function mandar(
   config: ConfigRecordatorios,
   booking: typeof schema.booking.$inferSelect,
   contacto: string | null,
-  zona: string
+  zona: string,
+  envioId: string
 ): Promise<{ estado: "enviado" | "omitido" | "fallido"; detalle: string | null }> {
   const conversationId = await conversacionDe(organizationId, booking);
   if (!conversationId) {
@@ -135,12 +139,37 @@ async function mandar(
     enlace: booking.meetingLink,
   };
 
-  try {
-    await sendText({ organizationId, conversationId, text: armarTexto(config.texto, valores) });
-    return { estado: "enviado", detalle: "Texto (ventana abierta)" };
-  } catch (err) {
-    if (!(err instanceof SendError && err.code === "window_closed")) {
-      return { estado: "fallido", detalle: err instanceof Error ? err.message : String(err) };
+  const texto = armarTexto(config.texto, valores);
+
+  // Con botones: Confirmo / Reagendar / Cancelar. Si el canal o Meta no los
+  // aceptan, sale el mismo texto sin botones; con la ventana cerrada, la plantilla.
+  let ventanaCerrada = false;
+  if (config.botones) {
+    try {
+      await sendBotones({
+        organizationId,
+        conversationId,
+        cuerpo: texto,
+        botones: BOTONES_CITA.map((b) => ({ id: idBotonCita(b.accion, envioId), titulo: b.titulo })),
+        textoEnHilo: textoConBotones(texto),
+      });
+      return { estado: "enviado", detalle: "Con botones (ventana abierta)" };
+    } catch (err) {
+      ventanaCerrada = err instanceof SendError && err.code === "window_closed";
+      if (!ventanaCerrada) {
+        console.warn("[recordatorios] sin botones:", err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  if (!ventanaCerrada) {
+    try {
+      await sendText({ organizationId, conversationId, text: texto });
+      return { estado: "enviado", detalle: "Texto (ventana abierta)" };
+    } catch (err) {
+      if (!(err instanceof SendError && err.code === "window_closed")) {
+        return { estado: "fallido", detalle: err instanceof Error ? err.message : String(err) };
+      }
     }
   }
 

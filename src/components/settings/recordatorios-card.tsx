@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { BellRing, X } from "lucide-react";
+import { BellRing, Reply, X } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,8 +16,10 @@ import {
   MAX_TEXTO,
   MIN_AVISO_MIN,
   PLANTILLA_SUGERIDA,
+  BOTONES_CITA,
   armarTexto,
   describirAviso,
+  type AccionCita,
   type ConfigRecordatorios,
   type EnvioDto,
 } from "@/lib/recordatorios";
@@ -51,6 +53,23 @@ const ESTADO: Record<EnvioDto["estado"], { texto: string; clase: string }> = {
   fallido: { texto: "Falló", clase: "bg-danger-tint text-danger-text" },
   enviando: { texto: "Enviando", clase: "bg-brand-tint text-brand-text" },
 };
+
+const RESPUESTA: Record<AccionCita, { texto: string; clase: string }> = {
+  confirmo: { texto: "✅ Confirmó", clase: "bg-success-tint text-success-text" },
+  reagendar: { texto: "🔁 Pidió reagendar", clase: "bg-info-tint text-info-text" },
+  cancelo: { texto: "❌ Canceló", clase: "bg-danger-tint text-danger-text" },
+};
+
+/** Qué contesta el CRM a cada botón (el campo de la configuración y su explicación). */
+const RESPUESTAS: { campo: "textoConfirmo" | "textoReagendar" | "textoCancelo"; label: string; nota: string }[] = [
+  { campo: "textoConfirmo", label: "Si toca «Confirmo»", nota: "Queda anotado en la cita." },
+  {
+    campo: "textoReagendar",
+    label: "Si toca «Reagendar»",
+    nota: "Queda anotado en la cita. Si el agente atiende esa conversación, él le ayuda a cambiarla y este texto no sale.",
+  },
+  { campo: "textoCancelo", label: "Si toca «Cancelar»", nota: "La cita se cancela sola y el horario queda libre." },
+];
 
 export function RecordatoriosCard() {
   const [datos, setDatos] = useState<Datos | null>(null);
@@ -203,10 +222,54 @@ export function RecordatoriosCard() {
             Usa <code>{"{nombre}"}</code>, <code>{"{fecha}"}</code>, <code>{"{hora}"}</code> y{" "}
             <code>{"{enlace}"}</code> (el link de la reunión, si hay).
           </p>
-          <p className="rounded-md bg-subtle p-2 text-sm">
+          <div className="rounded-md bg-subtle p-2 text-sm">
             <span className="text-xs text-muted-foreground">Así se ve: </span>
             {armarTexto(config.texto, EJEMPLO)}
-          </p>
+            {config.botones && (
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
+                {BOTONES_CITA.map((b) => (
+                  <span
+                    key={b.accion}
+                    className="flex items-center justify-center gap-1 rounded-md border bg-card py-1 text-xs font-medium text-brand-text"
+                  >
+                    <Reply className="h-3 w-3" aria-hidden /> {b.titulo}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Label>Botones Confirmo / Reagendar / Cancelar</Label>
+              <p className="text-xs text-muted-foreground">
+                El cliente contesta con un toque. Solo salen dentro de las 24 h; con la plantilla, no.
+              </p>
+            </div>
+            <Switch
+              checked={config.botones}
+              onCheckedChange={(v) => cambiar({ botones: v })}
+              label="Mandar el recordatorio con botones"
+              disabled={!editable}
+            />
+          </div>
+          {config.botones &&
+            RESPUESTAS.map((r) => (
+              <div key={r.campo} className="space-y-1">
+                <Label htmlFor={`recordatorio-${r.campo}`}>{r.label}</Label>
+                <Textarea
+                  id={`recordatorio-${r.campo}`}
+                  rows={2}
+                  maxLength={MAX_TEXTO}
+                  value={config[r.campo]}
+                  disabled={!editable}
+                  onChange={(e) => cambiar({ [r.campo]: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">{r.nota}</p>
+              </div>
+            ))}
         </div>
 
         <div className="space-y-1.5">
@@ -265,6 +328,13 @@ export function RecordatoriosCard() {
                     {ESTADO[e.estado].texto}
                   </span>
                   <span className="font-medium">{e.contacto || "Cliente"}</span>
+                  {e.respuesta && (
+                    <span
+                      className={cn("rounded-full px-2 py-0.5 text-[11px] font-medium", RESPUESTA[e.respuesta].clase)}
+                    >
+                      {RESPUESTA[e.respuesta].texto}
+                    </span>
+                  )}
                   <span className="text-muted-foreground">
                     cita {new Date(e.cita).toLocaleString("es-MX", { dateStyle: "medium", timeStyle: "short" })} ·{" "}
                     {describirAviso(e.minutos)}

@@ -6,6 +6,7 @@ import { scoped } from "@/lib/db/tenant";
 import {
   CONFIG_POR_DEFECTO,
   configSchema,
+  type AccionCita,
   type ConfigRecordatorios,
   type EnvioDto,
 } from "@/lib/recordatorios";
@@ -29,6 +30,10 @@ export const recordatorioConfig = pgTable("agencia_recordatorio_config", {
   avisos: jsonb("avisos").$type<number[]>().notNull(),
   texto: text("texto").notNull(),
   plantillaId: text("plantilla_id"),
+  botones: boolean("botones"),
+  textoConfirmo: text("texto_confirmo"),
+  textoCancelo: text("texto_cancelo"),
+  textoReagendar: text("texto_reagendar"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
@@ -41,6 +46,17 @@ export const recordatorioEnvio = pgTable("agencia_recordatorio_envio", {
   estado: text("estado", { enum: ["enviando", "enviado", "omitido", "fallido"] }).notNull(),
   detalle: text("detalle"),
   contacto: text("contacto"),
+  respuesta: text("respuesta", { enum: ["confirmo", "reagendar", "cancelo"] }),
+  respuestaEn: timestamp("respuesta_en"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+/** Cada toque de botón ya atendido (por su wamid): un reintento de Meta no lo atiende dos veces. */
+export const recordatorioRespuesta = pgTable("agencia_recordatorio_respuesta", {
+  waMessageId: text("wa_message_id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  envioId: text("envio_id").notNull(),
+  accion: text("accion").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -83,6 +99,35 @@ async function crear(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS agencia_recordatorio_envio_org_idx ON agencia_recordatorio_envio (organization_id, created_at)`
   );
+  // Botones Confirmo / Reagendar / Cancelar (se agregaron después: columnas nuevas, si faltan).
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_config ADD COLUMN IF NOT EXISTS botones boolean`);
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_config ADD COLUMN IF NOT EXISTS texto_confirmo text`);
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_config ADD COLUMN IF NOT EXISTS texto_cancelo text`);
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_config ADD COLUMN IF NOT EXISTS texto_reagendar text`);
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_envio ADD COLUMN IF NOT EXISTS respuesta text`);
+  await db.execute(sql`ALTER TABLE agencia_recordatorio_envio ADD COLUMN IF NOT EXISTS respuesta_en timestamp`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS agencia_recordatorio_respuesta (
+      wa_message_id text PRIMARY KEY,
+      organization_id text NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+      envio_id text NOT NULL REFERENCES agencia_recordatorio_envio(id) ON DELETE CASCADE,
+      accion text NOT NULL,
+      created_at timestamp NOT NULL DEFAULT now()
+    )`);
+}
+
+/** Lo guardado → la configuración; las columnas nuevas vacías toman su valor por defecto. */
+function aConfig(f: typeof recordatorioConfig.$inferSelect) {
+  return configSchema.safeParse({
+    activo: f.activo,
+    avisos: f.avisos,
+    texto: f.texto,
+    plantillaId: f.plantillaId,
+    botones: f.botones ?? undefined,
+    textoConfirmo: f.textoConfirmo ?? undefined,
+    textoCancelo: f.textoCancelo ?? undefined,
+    textoReagendar: f.textoReagendar ?? undefined,
+  });
 }
 
 export async function leerConfig(organizationId: string): Promise<ConfigRecordatorios> {
@@ -93,12 +138,7 @@ export async function leerConfig(organizationId: string): Promise<ConfigRecordat
     .where(scoped(recordatorioConfig.organizationId, organizationId))
     .limit(1);
   if (!fila) return CONFIG_POR_DEFECTO;
-  const r = configSchema.safeParse({
-    activo: fila.activo,
-    avisos: fila.avisos,
-    texto: fila.texto,
-    plantillaId: fila.plantillaId,
-  });
+  const r = aConfig(fila);
   return r.success ? r.data : { ...CONFIG_POR_DEFECTO, activo: fila.activo };
 }
 
@@ -107,7 +147,16 @@ export async function guardarConfig(
   c: ConfigRecordatorios
 ): Promise<ConfigRecordatorios> {
   await asegurarTablas();
-  const valores = { activo: c.activo, avisos: c.avisos, texto: c.texto, plantillaId: c.plantillaId };
+  const valores = {
+    activo: c.activo,
+    avisos: c.avisos,
+    texto: c.texto,
+    plantillaId: c.plantillaId,
+    botones: c.botones,
+    textoConfirmo: c.textoConfirmo,
+    textoCancelo: c.textoCancelo,
+    textoReagendar: c.textoReagendar,
+  };
   await getDb()
     .insert(recordatorioConfig)
     .values({ organizationId, ...valores, updatedAt: new Date() })
@@ -128,12 +177,7 @@ export async function configsActivas(): Promise<
     .from(recordatorioConfig)
     .where(eq(recordatorioConfig.activo, true));
   return filas.flatMap((f) => {
-    const r = configSchema.safeParse({
-      activo: f.activo,
-      avisos: f.avisos,
-      texto: f.texto,
-      plantillaId: f.plantillaId,
-    });
+    const r = aConfig(f);
     return r.success && r.data.avisos.length ? [{ organizationId: f.organizationId, config: r.data }] : [];
   });
 }
@@ -184,6 +228,42 @@ export async function ultimosEnvios(organizationId: string, limite = 15): Promis
     minutos: f.minutos,
     estado: f.estado,
     detalle: f.detalle,
+    respuesta: f.respuesta ?? null,
     creadoEn: f.createdAt.toISOString(),
   }));
+}
+
+/* ─────────────── Respuestas con los botones ─────────────── */
+
+export async function envioPorId(organizationId: string, id: string) {
+  await asegurarTablas();
+  const [f] = await getDb()
+    .select()
+    .from(recordatorioEnvio)
+    .where(scoped(recordatorioEnvio.organizationId, organizationId, eq(recordatorioEnvio.id, id)))
+    .limit(1);
+  return f ?? null;
+}
+
+/** Aparta un toque de botón para atenderlo; false si ya se atendió (reintento de Meta). */
+export async function apartarRespuesta(input: {
+  organizationId: string;
+  waMessageId: string;
+  envioId: string;
+  accion: AccionCita;
+}): Promise<boolean> {
+  await asegurarTablas();
+  const filas = await getDb()
+    .insert(recordatorioRespuesta)
+    .values(input)
+    .onConflictDoNothing()
+    .returning({ id: recordatorioRespuesta.waMessageId });
+  return filas.length > 0;
+}
+
+export async function anotarRespuesta(envioId: string, accion: AccionCita): Promise<void> {
+  await getDb()
+    .update(recordatorioEnvio)
+    .set({ respuesta: accion, respuestaEn: new Date() })
+    .where(eq(recordatorioEnvio.id, envioId));
 }
