@@ -240,7 +240,8 @@ export function ContadorMensajes() {
                   <b className="text-lg tabular-nums">{n(d.oficial.plantillas)}</b>
                 </p>
                 <p className="self-end text-xs text-text-3">
-                  Actualizado {hace(d.oficial.actualizadoEn)}.
+                  Actualizado {hace(d.oficial.actualizadoEn)}. {n(d.confirmadosPorMeta)} mensajes del CRM
+                  ya traen el cobro confirmado por Meta uno por uno.
                   {!d.oficial.moneda && " Meta no reporta moneda: la cuenta no tiene tarjeta o es de prueba, y no cobra."}
                 </p>
               </div>

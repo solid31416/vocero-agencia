@@ -63,6 +63,7 @@ describe("resumirMes", () => {
     );
     expect(r.servicio.cobradas).toBe(50);
     expect(r.servicio.gratis).toBe(100);
+    expect(r.confirmadosPorMeta).toBe(150);
   });
 
   it("un fallo de pago manda sobre todo lo demás", () => {

@@ -114,6 +114,8 @@ export type ResumenMes = {
    * al conteo (Meta es quien cobra), pero no tienen día ni quién los mandó.
    */
   fueraDelCrm: { respuestas: number; plantillas: number };
+  /** Cuántos mensajes del CRM traen el dato de cobro que Meta manda con cada entrega. */
+  confirmadosPorMeta: number;
 };
 
 const redondea = (n: number) => Math.round(n * 100) / 100;
@@ -138,12 +140,14 @@ export function resumirMes(
   const cuenta: Record<Categoria, number> = { service: 0, utility: 0, marketing: 0, authentication: 0 };
   let servicioRegularDeMeta = 0;
   let servicioConTipo = 0;
+  let confirmadosPorMeta = 0;
   const porDia = Array.from({ length: opts.diasMes }, (_, i) => ({ dia: i + 1, nea: 0, personas: 0, plantillas: 0 }));
   const porOrigen = { nea: 0, personas: 0, plantillas: 0 };
 
   for (const f of filas) {
     const cat = categoriaDe(f);
     cuenta[cat] += 1;
+    if (f.categoria) confirmadosPorMeta += 1;
     if (cat === "service" && f.tipo) {
       servicioConTipo += 1;
       if (f.tipo === "regular") servicioRegularDeMeta += 1;
@@ -215,6 +219,7 @@ export function resumirMes(
     estado,
     fallosPago,
     fueraDelCrm,
+    confirmadosPorMeta,
   };
 }
 
