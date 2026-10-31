@@ -147,6 +147,14 @@ export function ContadorMensajes() {
                         ? `Te quedan ${n(GRATIS_SERVICIO - d.servicio.usadas)}. A este ritmo se acaban el día ${d.proyeccion.diaQueSeAcaban}.`
                         : `Te quedan ${n(GRATIS_SERVICIO - d.servicio.usadas)}. A este ritmo te alcanzan todo el mes.`}
                   </p>
+                  {(d.fueraDelCrm.respuestas > 0 || d.fueraDelCrm.plantillas > 0) && (
+                    <p className="rounded-md bg-subtle px-3 py-2 text-xs text-text-2">
+                      Incluye {n(d.fueraDelCrm.respuestas)} respuestas
+                      {d.fueraDelCrm.plantillas > 0 && ` y ${n(d.fueraDelCrm.plantillas)} plantillas`} que Meta contó y
+                      ya no están en el CRM (conversaciones borradas o mensajes enviados por fuera). Se suman porque Meta
+                      cobra lo que ella cuenta; no salen en la gráfica por día.
+                    </p>
+                  )}
                 </div>
               )}
             </Section>
@@ -301,6 +309,9 @@ export function ContadorMensajes() {
                     ["Nea", d.porOrigen.nea, "bg-primary"],
                     ["Personas", d.porOrigen.personas, "bg-success"],
                     ["Plantillas", d.porOrigen.plantillas, "bg-warning"],
+                    ...(d.fueraDelCrm.respuestas + d.fueraDelCrm.plantillas > 0
+                      ? ([["Sin detalle", d.fueraDelCrm.respuestas + d.fueraDelCrm.plantillas, "bg-text-3"]] as const)
+                      : []),
                   ] as const
                 ).map(([k, v, c]) => {
                   const max = Math.max(1, d.porOrigen.nea, d.porOrigen.personas, d.porOrigen.plantillas);

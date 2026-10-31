@@ -4,6 +4,7 @@ import {
   fallosDePago,
   filasDelMes,
   leerConfig,
+  leerOficial,
   mesEnZona,
   type ConfigGuardada,
   type Mes,
@@ -18,10 +19,11 @@ export type Calculo = { resumen: ResumenMes; mes: Mes; config: ConfigGuardada; t
 export async function calcularMes(organizationId: string, ahora = new Date()): Promise<Calculo> {
   const tz = await businessTimezone(organizationId);
   const mes = mesEnZona(ahora, tz);
-  const [config, filas, fallos] = await Promise.all([
+  const [config, filas, fallos, oficial] = await Promise.all([
     leerConfig(organizationId),
     filasDelMes(organizationId, mes, tz),
     fallosDePago(organizationId, mes),
+    leerOficial(organizationId, mes.mes),
   ]);
   const resumen = resumirMes(filas, {
     dia: mes.dia,
@@ -29,6 +31,7 @@ export async function calcularMes(organizationId: string, ahora = new Date()): P
     tarifas: config.tarifas,
     alertaPct: config.alertaPct,
     fallosPago: fallos,
+    minimos: oficial ? { respuestas: oficial.respuestas, plantillas: oficial.plantillas } : null,
   });
   return { resumen, mes, config, tz };
 }

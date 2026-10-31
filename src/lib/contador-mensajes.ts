@@ -108,6 +108,12 @@ export type ResumenMes = {
   porOrigen: { nea: number; personas: number; plantillas: number };
   estado: Estado;
   fallosPago: number;
+  /**
+   * Lo que el reporte oficial de Meta cuenta y el CRM no: mensajes de
+   * conversaciones que se borraron o que salieron por fuera del CRM. Se suman
+   * al conteo (Meta es quien cobra), pero no tienen día ni quién los mandó.
+   */
+  fueraDelCrm: { respuestas: number; plantillas: number };
 };
 
 const redondea = (n: number) => Math.round(n * 100) / 100;
@@ -119,7 +125,15 @@ const redondea = (n: number) => Math.round(n * 100) / 100;
  */
 export function resumirMes(
   filas: readonly FilaMensaje[],
-  opts: { dia: number; diasMes: number; tarifas: Record<Categoria, number>; alertaPct: number; fallosPago?: number }
+  opts: {
+    dia: number;
+    diasMes: number;
+    tarifas: Record<Categoria, number>;
+    alertaPct: number;
+    fallosPago?: number;
+    /** Lo que dice el reporte oficial de Meta; si es más que lo del CRM, manda Meta. */
+    minimos?: { respuestas: number; plantillas: number } | null;
+  }
 ): ResumenMes {
   const cuenta: Record<Categoria, number> = { service: 0, utility: 0, marketing: 0, authentication: 0 };
   let servicioRegularDeMeta = 0;
@@ -139,6 +153,17 @@ export function resumirMes(
     const d = porDia[Math.min(Math.max(f.dia, 1), opts.diasMes) - 1];
     if (d) d[quien] += 1;
   }
+
+  // Meta cobra lo que ELLA cuenta: si su reporte trae más, la diferencia se suma (sin día ni origen).
+  const fueraDelCrm = {
+    respuestas: Math.max(0, (opts.minimos?.respuestas ?? 0) - cuenta.service),
+    plantillas: Math.max(
+      0,
+      (opts.minimos?.plantillas ?? 0) - (cuenta.utility + cuenta.marketing + cuenta.authentication)
+    ),
+  };
+  cuenta.service += fueraDelCrm.respuestas;
+  cuenta.utility += fueraDelCrm.plantillas;
 
   const usadas = cuenta.service;
   // Lo que Meta marcó como cobrado manda; a las que no traen tipo se les aplica la regla de las 1,000.
@@ -189,6 +214,7 @@ export function resumirMes(
     porOrigen,
     estado,
     fallosPago,
+    fueraDelCrm,
   };
 }
 

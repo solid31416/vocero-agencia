@@ -77,6 +77,16 @@ describe("resumirMes", () => {
     expect(resumirMes(filas(150), base).proyeccion.diaQueSeAcaban).toBeNull();
   });
 
+  it("si el reporte de Meta cuenta más que el CRM, manda Meta", () => {
+    const r = resumirMes(filas(18), { ...base, minimos: { respuestas: 81, plantillas: 3 } });
+    expect(r.servicio.usadas).toBe(81);
+    expect(r.plantillas.utility).toBe(3);
+    expect(r.fueraDelCrm).toEqual({ respuestas: 63, plantillas: 3 });
+    const igual = resumirMes(filas(100), { ...base, minimos: { respuestas: 40, plantillas: 0 } });
+    expect(igual.servicio.usadas).toBe(100);
+    expect(igual.fueraDelCrm).toEqual({ respuestas: 0, plantillas: 0 });
+  });
+
   it("reparte por día y por quién manda", () => {
     const r = resumirMes(
       [
