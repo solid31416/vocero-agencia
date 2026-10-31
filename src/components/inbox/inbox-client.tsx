@@ -28,6 +28,7 @@ import { ContactPanel } from "./contact-panel";
 import { IaRapida } from "./ia-rapida";
 import { AgendarCita } from "./agendar-cita";
 import { AvisoReactivar } from "./aviso-reactivar";
+import { ResumenTraspaso } from "./resumen-traspaso";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -539,6 +540,8 @@ export function InboxClient({
                 </button>
               )}
             </header>
+            {/* Módulo de la agencia: el resumen para quien atiende (RESUMEN_TRASPASO). */}
+            <ResumenTraspaso conversation={selected} />
             <Composer
               // 028: uno por conversación. Sin la llave, el borrador, el adjunto
               // elegido y el panel abierto pasaban a la siguiente conversación.

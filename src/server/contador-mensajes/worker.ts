@@ -77,7 +77,9 @@ async function revisar(organizationId: string, ahora: Date): Promise<void> {
 export async function avisarAlDueno(
   organizationId: string,
   config: Pick<ConfigContador, "telefonoDueno" | "plantillaId">,
-  texto: string
+  texto: string,
+  /** El resumen para quien atiende lo usa sin el ⚠️ del contador. */
+  prefijo = "⚠️ "
 ): Promise<string> {
   if (!config.telefonoDueno) return "Solo en el CRM: no hay teléfono del dueño para avisarle por WhatsApp";
   const db = getDb();
@@ -115,7 +117,7 @@ export async function avisarAlDueno(
   }
 
   try {
-    await sendText({ organizationId, conversationId: conv.id, text: `⚠️ ${texto}` });
+    await sendText({ organizationId, conversationId: conv.id, text: `${prefijo}${texto}` });
     return "Enviado al dueño por WhatsApp";
   } catch (err) {
     if (!(err instanceof SendError && err.code === "window_closed")) {

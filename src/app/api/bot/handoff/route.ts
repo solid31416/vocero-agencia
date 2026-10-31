@@ -5,6 +5,7 @@ import { apiError, parseBody } from "@/lib/api";
 import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { publish } from "@/server/events/bus";
 import { toHandoffReason } from "@/server/bot/handoff";
+import { dispararResumen } from "@/server/resumen-traspaso/generar";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +56,13 @@ export async function POST(req: Request) {
   if (!conv) return apiError(404, "not_found", "Conversación no encontrada");
 
   if (!conv.handoffAt) {
+    const motivo = toHandoffReason(body.data.reason);
     await db
       .update(schema.conversation)
       .set({
         aiEnabled: false,
         handoffAt: new Date(),
-        handoffReason: toHandoffReason(body.data.reason),
+        handoffReason: motivo,
         updatedAt: new Date(),
       })
       .where(eq(schema.conversation.id, conv.id));
@@ -68,6 +70,8 @@ export async function POST(req: Request) {
       type: "conversation.updated",
       data: { conversation: { id: conv.id } },
     });
+    // Módulo de la agencia: el resumen para quien atiende (y el aviso al dueño).
+    dispararResumen(organizationId, conv.id, motivo, { avisar: true });
   }
   return Response.json({ ok: true });
 }

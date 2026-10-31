@@ -6,6 +6,7 @@ import { construirEventoOlvido } from "@/server/brains/contract";
 import { avisarOlvido, type ResultadoOlvido } from "@/server/brains/deliver";
 import { publish } from "@/server/events/bus";
 import { eliminarConversacion } from "@/server/inbox/eliminar";
+import { dispararResumen } from "@/server/resumen-traspaso/generar";
 import { serializeConversation, getConversation, updateConversation } from "@/server/inbox/queries";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,8 @@ export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {
 
   const updated = await updateConversation(session.organizationId, id, body.data);
   if (!updated) return apiError(404, "not_found", "Conversación no encontrada");
+  // Módulo de la agencia: al pausar la IA a mano, el resumen para quien atiende.
+  if (body.data.aiEnabled === false) dispararResumen(session.organizationId, id, "manual", { avisar: false });
 
   const row = await getConversation(session.organizationId, id);
   if (row) {
