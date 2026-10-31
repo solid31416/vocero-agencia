@@ -17,5 +17,8 @@ export async function register(): Promise<void> {
     await encryptLegacySecrets();
     resumeDispatch();
     resumeWebhooks();
+    // Módulo de la agencia: recordatorios de cita (RECORDATORIOS_CITAS).
+    const { iniciarRecordatorios } = await import("./server/recordatorios/worker");
+    iniciarRecordatorios();
   }
 }

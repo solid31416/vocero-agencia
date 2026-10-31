@@ -56,6 +56,10 @@ export const envSchema = z.object({
   // escritos por la IA desde el perfil y el conocimiento del agente (editables).
   // Apagado por defecto. Ej.: LAB_A_LA_MEDIDA=on
   LAB_A_LA_MEDIDA: z.string().optional(),
+  // Módulo de la agencia: recordatorios de cita por WhatsApp (días, horas o
+  // minutos antes; los elige el dueño en Ajustes → Agenda). Necesita AGENDA.
+  // Apagado por defecto. Ej.: RECORDATORIOS_CITAS=on
+  RECORDATORIOS_CITAS: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),
