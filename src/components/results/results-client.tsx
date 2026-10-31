@@ -65,12 +65,15 @@ export function ResultsClient({
   agenda,
   today,
   timezone,
+  accionExtra = null,
 }: {
   currency: string;
   agenda: boolean;
   /** Hoy en la zona del negocio (`YYYY-MM-DD`), resuelto en el servidor. */
   today: string;
   timezone: string;
+  /** Módulo de la agencia: botón extra en la cabecera (enlace al contador de mensajes). */
+  accionExtra?: React.ReactNode;
 }) {
   const [range, setRange] = useState<Range>(() => defaultRange(today));
   const [sales, setSales] = useState<Block<SalesBlockDto>>(inicial);
@@ -103,7 +106,11 @@ export function ResultsClient({
             Ventas, el trabajo del agente, de dónde llegan y qué se está cayendo.
           </p>
         </div>
-        <RangePicker value={range} onChange={setRange} today={today} timezone={timezone} />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Módulo de la agencia: el enlace al contador de mensajes, si está encendido. */}
+          {accionExtra}
+          <RangePicker value={range} onChange={setRange} today={today} timezone={timezone} />
+        </div>
       </header>
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-6">

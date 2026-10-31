@@ -32,6 +32,9 @@ import {
   resolverCita,
   type CitaEncontrada,
 } from "@/server/inbox/quotes";
+// Módulo de la agencia — contador de mensajes y costo de Meta.
+import { contadorEnabled } from "@/server/contador-mensajes/flag";
+import { registrarAvisoDeMeta } from "@/server/contador-mensajes/store";
 
 /** Tipos de contenido soportados; el resto se ignora sin error. */
 const SUPPORTED_TYPES = new Set([
@@ -284,6 +287,8 @@ export async function processMessagesValue(value: WebhookValue): Promise<void> {
 
   for (const status of value.statuses ?? []) {
     await applyStatusUpdate(organizationId, status);
+    // Módulo de la agencia: lo que Meta dice del cobro de ese mensaje. Nunca lanza.
+    if (contadorEnabled()) await registrarAvisoDeMeta(organizationId, status);
   }
 
   for (const msg of value.messages ?? []) {

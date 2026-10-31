@@ -20,5 +20,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: recordatorios de cita (RECORDATORIOS_CITAS).
     const { iniciarRecordatorios } = await import("./server/recordatorios/worker");
     iniciarRecordatorios();
+    // Módulo de la agencia: contador de mensajes y costo de Meta (CONTADOR_MENSAJES).
+    const { iniciarContador } = await import("./server/contador-mensajes/worker");
+    iniciarContador();
   }
 }

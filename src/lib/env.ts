@@ -60,6 +60,10 @@ export const envSchema = z.object({
   // minutos antes; los elige el dueño en Ajustes → Agenda). Necesita AGENDA.
   // Apagado por defecto. Ej.: RECORDATORIOS_CITAS=on
   RECORDATORIOS_CITAS: z.string().optional(),
+  // Módulo de la agencia: contador de mensajes de WhatsApp y costo de Meta
+  // (Resultados → Mensajes, franja de aviso y aviso al dueño por WhatsApp).
+  // Apagado por defecto. Ej.: CONTADOR_MENSAJES=on
+  CONTADOR_MENSAJES: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

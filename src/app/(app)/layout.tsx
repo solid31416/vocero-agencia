@@ -11,6 +11,8 @@ import { enabledChannels } from "@/server/channels/enabled";
 import { navKicker } from "@/lib/channels";
 import { avisoIaDe } from "@/server/ai/aviso";
 import { AvisoIaBanner } from "@/components/avisos/aviso-ia";
+// Módulo de la agencia — contador de mensajes (CONTADOR_MENSAJES).
+import { AvisoMensajesBanner } from "@/components/avisos/aviso-mensajes";
 
 export default async function AppLayout({
   children,
@@ -43,7 +45,12 @@ export default async function AppLayout({
       // cliente: no puede —ni debe— leer variables de entorno.
       agenda={agendaEnabled()}
       kicker={navKicker([...enabledChannels()])}
-      aviso={<AvisoIaBanner aviso={aviso} />}
+      aviso={
+        <>
+          <AvisoIaBanner aviso={aviso} />
+          <AvisoMensajesBanner organizationId={session.organizationId} role={session.role} />
+        </>
+      }
     >
       {children}
     </AppShell>
