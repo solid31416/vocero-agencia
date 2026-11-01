@@ -23,5 +23,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: contador de mensajes y costo de Meta (CONTADOR_MENSAJES).
     const { iniciarContador } = await import("./server/contador-mensajes/worker");
     iniciarContador();
+    // Módulo de la agencia: el agente aprende de sus traspasos (APRENDE_DE_TRASPASOS).
+    const { iniciarAprende } = await import("./server/aprende-traspasos/analizar");
+    iniciarAprende();
   }
 }

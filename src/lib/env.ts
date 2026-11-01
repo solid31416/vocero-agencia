@@ -68,6 +68,11 @@ export const envSchema = z.object({
   // conversación o alguien pausa la IA). Se enciende/apaga en Ajustes → IA.
   // Apagado por defecto. Ej.: RESUMEN_TRASPASO=on
   RESUMEN_TRASPASO: z.string().optional(),
+  // Módulo de la agencia: el agente aprende de sus traspasos. Cuando una persona
+  // atiende una conversación que el agente pasó, la IA propone preguntas y
+  // respuestas para el conocimiento; el dueño las aprueba en la pantalla Agente.
+  // Apagado por defecto. Ej.: APRENDE_DE_TRASPASOS=on
+  APRENDE_DE_TRASPASOS: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { BrainStatusCard } from "@/components/agent/brain-status-card";
+import { AprendeCard } from "@/components/agent/aprende-card";
 import { externalDown, type BrainStatusDto } from "@/lib/brain-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -218,6 +219,8 @@ export function AgentClient() {
         />
         <ProfileSection profile={profile} onSave={saveProfile} />
         <KbSection entries={entries} kbSize={kbSize} onChanged={() => void refetch()} />
+        {/* Módulo de la agencia: lo que el agente aprende de sus traspasos (APRENDE_DE_TRASPASOS). */}
+        <AprendeCard onAprobada={() => void refetch()} />
       </div>
     </div>
   );

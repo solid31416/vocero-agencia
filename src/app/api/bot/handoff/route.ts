@@ -6,6 +6,7 @@ import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { publish } from "@/server/events/bus";
 import { toHandoffReason } from "@/server/bot/handoff";
 import { dispararResumen } from "@/server/resumen-traspaso/generar";
+import { registrarTraspaso } from "@/server/aprende-traspasos/analizar";
 
 export const dynamic = "force-dynamic";
 
@@ -72,6 +73,8 @@ export async function POST(req: Request) {
     });
     // Módulo de la agencia: el resumen para quien atiende (y el aviso al dueño).
     dispararResumen(organizationId, conv.id, motivo, { avisar: true });
+    // Módulo de la agencia: que el agente aprenda de lo que conteste la persona.
+    registrarTraspaso(organizationId, conv.id, motivo);
   }
   return Response.json({ ok: true });
 }
