@@ -26,5 +26,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: el agente aprende de sus traspasos (APRENDE_DE_TRASPASOS).
     const { iniciarAprende } = await import("./server/aprende-traspasos/analizar");
     iniciarAprende();
+    // Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE).
+    const { iniciarTermometro } = await import("./server/termometro/clasificar");
+    iniciarTermometro();
   }
 }

@@ -29,6 +29,7 @@ import { IaRapida } from "./ia-rapida";
 import { AgendarCita } from "./agendar-cita";
 import { AvisoReactivar } from "./aviso-reactivar";
 import { ResumenTraspaso } from "./resumen-traspaso";
+import { TermometroBarra } from "./termometro";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -542,6 +543,8 @@ export function InboxClient({
             </header>
             {/* Módulo de la agencia: el resumen para quien atiende (RESUMEN_TRASPASO). */}
             <ResumenTraspaso conversation={selected} />
+            {/* Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE). */}
+            <TermometroBarra conversation={selected} />
             <Composer
               // 028: uno por conversación. Sin la llave, el borrador, el adjunto
               // elegido y el panel abierto pasaban a la siguiente conversación.

@@ -73,6 +73,11 @@ export const envSchema = z.object({
   // respuestas para el conocimiento; el dueño las aprueba en la pantalla Agente.
   // Apagado por defecto. Ej.: APRENDE_DE_TRASPASOS=on
   APRENDE_DE_TRASPASOS: z.string().optional(),
+  // Módulo de la agencia: termómetro del cliente. La IA pone a cada conversación
+  // temperatura (caliente/tibia/fría) y etiquetas que el dueño personaliza en
+  // Ajustes → IA; la bandeja filtra por ellas. Apagado por defecto.
+  // Ej.: TERMOMETRO_CLIENTE=on
+  TERMOMETRO_CLIENTE: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

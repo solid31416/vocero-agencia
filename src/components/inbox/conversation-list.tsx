@@ -16,6 +16,8 @@ import { EVENTO_BORRADOR, leerBorrador } from "@/lib/borradores";
 import { atajoBandeja, esCampoDeTexto, sirveEscribiendo, vecina } from "@/lib/atajos";
 import { hayDialogoAbierto } from "@/components/atajos-globales";
 import { etiquetaVence, porVencer } from "@/lib/filtros-bandeja";
+import { TEMPERATURAS, TEMPERATURA_INFO, type Temperatura } from "@/lib/termometro";
+import { ChipsTermometro, useTermometro } from "./termometro";
 
 /* Puntos de etapa: los tokens del tema, no hex copiados del tema claro —
    así siguen al acento white-label y se recalculan en oscuro. */
@@ -119,6 +121,10 @@ export function ConversationList({
     };
   }, [menuFiltros]);
   const [stage, setStage] = useState<string>("all");
+  // Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE). `null` = apagado.
+  const termometro = useTermometro(conversationsProp);
+  const [temperatura, setTemperatura] = useState<Temperatura | "all">("all");
+  const [etiqueta, setEtiqueta] = useState<string>("all");
   const [inbox, setInbox] = useState<Channel | "all">("all");
   const inputRef = useRef<HTMLInputElement>(null);
   // 055 · D3 — Alt+J / Alt+K recorren la lista en el orden que se ve (con los
@@ -191,8 +197,13 @@ export function ConversationList({
   const venciendo = inInbox.filter(porVencer);
   // Lo del menú «Filtrar» se aplica antes de las pestañas: «Todas» y «No
   // leídas» cuentan dentro de lo filtrado.
+  const termo = (id: string) => termometro?.conversaciones[id];
   const filtrado = inInbox.filter(
-    (c) => (!soloPorVencer || porVencer(c)) && (!soloAnuncios || c.anuncio !== null)
+    (c) =>
+      (!soloPorVencer || porVencer(c)) &&
+      (!soloAnuncios || c.anuncio !== null) &&
+      (!termometro || temperatura === "all" || termo(c.id)?.temperatura === temperatura) &&
+      (!termometro || etiqueta === "all" || (termo(c.id)?.etiquetas.includes(etiqueta) ?? false))
   );
   const unreadCount = filtrado.filter((c) => c.unreadCount > 0).length;
   const visible = filter === "unread" ? filtrado.filter((c) => c.unreadCount > 0) : filtrado;
@@ -201,11 +212,20 @@ export function ConversationList({
     { id: "all", label: "Todas", count: filtrado.length },
     { id: "unread", label: "No leídas", count: unreadCount },
   ];
-  const nFiltros = (stage !== "all" ? 1 : 0) + (soloPorVencer ? 1 : 0) + (soloAnuncios ? 1 : 0);
+  const conTemperatura = termometro !== null && temperatura !== "all";
+  const conEtiqueta = termometro !== null && etiqueta !== "all";
+  const nFiltros =
+    (stage !== "all" ? 1 : 0) +
+    (soloPorVencer ? 1 : 0) +
+    (soloAnuncios ? 1 : 0) +
+    (conTemperatura ? 1 : 0) +
+    (conEtiqueta ? 1 : 0);
   function limpiarFiltros() {
     setStage("all");
     setSoloPorVencer(false);
     setSoloAnuncios(false);
+    setTemperatura("all");
+    setEtiqueta("all");
   }
   // Con un solo canal encendido no hay bandejas que distinguir: ni marca en
   // los renglones ni filtro. La pantalla queda exactamente como antes de 014.
@@ -358,6 +378,49 @@ export function ConversationList({
                     </select>
                   </label>
                 )}
+                {termometro && (
+                  <label className="block space-y-1">
+                    <span className="kicker text-text-3">Temperatura</span>
+                    <select
+                      value={temperatura}
+                      onChange={(e) => setTemperatura(e.target.value as Temperatura | "all")}
+                      aria-label="Filtrar por temperatura"
+                      className={cn(
+                        "w-full rounded-md border border-border-strong bg-background px-2 py-1.5 text-[13px]",
+                        FOCO_SEPARADO
+                      )}
+                    >
+                      <option value="all">Cualquier temperatura</option>
+                      {TEMPERATURAS.map((t) => (
+                        <option key={t} value={t}>
+                          {TEMPERATURA_INFO[t].emoji} {TEMPERATURA_INFO[t].etiqueta} (
+                          {inInbox.filter((c) => termo(c.id)?.temperatura === t).length})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+                {termometro && termometro.etiquetas.length > 0 && (
+                  <label className="block space-y-1">
+                    <span className="kicker text-text-3">Etiqueta</span>
+                    <select
+                      value={etiqueta}
+                      onChange={(e) => setEtiqueta(e.target.value)}
+                      aria-label="Filtrar por etiqueta"
+                      className={cn(
+                        "w-full rounded-md border border-border-strong bg-background px-2 py-1.5 text-[13px]",
+                        FOCO_SEPARADO
+                      )}
+                    >
+                      <option value="all">Cualquier etiqueta</option>
+                      {termometro.etiquetas.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.nombre} ({inInbox.filter((c) => termo(c.id)?.etiquetas.includes(e.id)).length})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {/* Como antes: sin ninguna, la casilla no aparece (salvo que esté marcada). */}
                 {(venciendo.length > 0 || soloPorVencer) && (
                   <label className="flex cursor-pointer items-center gap-2 text-[13px]">
@@ -383,7 +446,7 @@ export function ConversationList({
                     <span className="font-mono text-[11px] text-text-3">{deAnuncios.length}</span>
                   </label>
                 )}
-                {stages.length === 0 && venciendo.length === 0 && deAnuncios.length === 0 && nFiltros === 0 && (
+                {stages.length === 0 && venciendo.length === 0 && deAnuncios.length === 0 && nFiltros === 0 && !termometro && (
                   <p className="text-[13px] text-text-3">Todavía no hay nada por qué filtrar.</p>
                 )}
                 {nFiltros > 0 && (
@@ -410,6 +473,18 @@ export function ConversationList({
             )}
             {soloAnuncios && (
               <FiltroPuesto texto="De anuncios" onQuitar={() => setSoloAnuncios(false)} />
+            )}
+            {conTemperatura && (
+              <FiltroPuesto
+                texto={`${TEMPERATURA_INFO[temperatura].emoji} ${TEMPERATURA_INFO[temperatura].etiqueta}`}
+                onQuitar={() => setTemperatura("all")}
+              />
+            )}
+            {conEtiqueta && (
+              <FiltroPuesto
+                texto={`Etiqueta: ${termometro?.etiquetas.find((e) => e.id === etiqueta)?.nombre ?? etiqueta}`}
+                onQuitar={() => setEtiqueta("all")}
+              />
             )}
           </div>
         )}
@@ -502,7 +577,10 @@ export function ConversationList({
                           </span>
                         )}
                       </span>
-                      <span className="mt-1.5 flex items-center gap-1.5">
+                      <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {termometro && (
+                          <ChipsTermometro dto={termometro.conversaciones[c.id]} etiquetas={termometro.etiquetas} />
+                        )}
                         {c.stageName && (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-border-strong bg-chip px-2 py-0.5 text-[11px] font-medium text-text-2">
                             <span
