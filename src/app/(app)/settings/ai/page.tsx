@@ -3,6 +3,8 @@ import { ResumenTraspasoCard } from "@/components/settings/resumen-traspaso-card
 import { resumenEnabled } from "@/server/resumen-traspaso/flag";
 import { TermometroCard } from "@/components/settings/termometro-card";
 import { termometroEnabled } from "@/server/termometro/flag";
+import { EsperaCard } from "@/components/settings/espera-card";
+import { esperaEnabled } from "@/server/espera-humano/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +16,8 @@ export default function AiSettingsPage() {
       {resumenEnabled() && <ResumenTraspasoCard />}
       {/* Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE). */}
       {termometroEnabled() && <TermometroCard />}
+      {/* Módulo de la agencia: «Nadie ha contestado» (ESPERA_HUMANO). */}
+      {esperaEnabled() && <EsperaCard />}
     </div>
   );
 }

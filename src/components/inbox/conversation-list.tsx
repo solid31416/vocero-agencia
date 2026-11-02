@@ -18,6 +18,7 @@ import { hayDialogoAbierto } from "@/components/atajos-globales";
 import { etiquetaVence, porVencer } from "@/lib/filtros-bandeja";
 import { TEMPERATURAS, TEMPERATURA_INFO, type Temperatura } from "@/lib/termometro";
 import { ChipsTermometro, useTermometro } from "./termometro";
+import { ChipEspera, useAhora, useEspera } from "./espera";
 
 /* Puntos de etapa: los tokens del tema, no hex copiados del tema claro —
    así siguen al acento white-label y se recalculan en oscuro. */
@@ -123,6 +124,10 @@ export function ConversationList({
   const [stage, setStage] = useState<string>("all");
   // Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE). `null` = apagado.
   const termometro = useTermometro(conversationsProp);
+  // Módulo de la agencia: «Nadie ha contestado» (ESPERA_HUMANO). `null` = apagado.
+  const espera = useEspera(conversationsProp);
+  const ahora = useAhora();
+  const [soloEsperando, setSoloEsperando] = useState(false);
   const [temperatura, setTemperatura] = useState<Temperatura | "all">("all");
   const [etiqueta, setEtiqueta] = useState<string>("all");
   const [inbox, setInbox] = useState<Channel | "all">("all");
@@ -198,8 +203,11 @@ export function ConversationList({
   // Lo del menú «Filtrar» se aplica antes de las pestañas: «Todas» y «No
   // leídas» cuentan dentro de lo filtrado.
   const termo = (id: string) => termometro?.conversaciones[id];
+  const esperando = espera ? inInbox.filter((c) => espera.conversaciones[c.id]) : [];
+  const conEspera = espera !== null && soloEsperando;
   const filtrado = inInbox.filter(
     (c) =>
+      (!conEspera || Boolean(espera?.conversaciones[c.id])) &&
       (!soloPorVencer || porVencer(c)) &&
       (!soloAnuncios || c.anuncio !== null) &&
       (!termometro || temperatura === "all" || termo(c.id)?.temperatura === temperatura) &&
@@ -217,12 +225,14 @@ export function ConversationList({
   const nFiltros =
     (stage !== "all" ? 1 : 0) +
     (soloPorVencer ? 1 : 0) +
+    (conEspera ? 1 : 0) +
     (soloAnuncios ? 1 : 0) +
     (conTemperatura ? 1 : 0) +
     (conEtiqueta ? 1 : 0);
   function limpiarFiltros() {
     setStage("all");
     setSoloPorVencer(false);
+    setSoloEsperando(false);
     setSoloAnuncios(false);
     setTemperatura("all");
     setEtiqueta("all");
@@ -422,6 +432,18 @@ export function ConversationList({
                   </label>
                 )}
                 {/* Como antes: sin ninguna, la casilla no aparece (salvo que esté marcada). */}
+                {espera && (esperando.length > 0 || soloEsperando) && (
+                  <label className="flex cursor-pointer items-center gap-2 text-[13px]">
+                    <input
+                      type="checkbox"
+                      checked={soloEsperando}
+                      onChange={(e) => setSoloEsperando(e.target.checked)}
+                      className="h-4 w-4 accent-[var(--accent)]"
+                    />
+                    <span className="flex-1">Esperando a una persona</span>
+                    <span className="font-mono text-[11px] text-text-3">{esperando.length}</span>
+                  </label>
+                )}
                 {(venciendo.length > 0 || soloPorVencer) && (
                   <label className="flex cursor-pointer items-center gap-2 text-[13px]">
                     <input
@@ -470,6 +492,9 @@ export function ConversationList({
             )}
             {soloPorVencer && (
               <FiltroPuesto texto="Por vencer" onQuitar={() => setSoloPorVencer(false)} />
+            )}
+            {conEspera && (
+              <FiltroPuesto texto="Esperando a una persona" onQuitar={() => setSoloEsperando(false)} />
             )}
             {soloAnuncios && (
               <FiltroPuesto texto="De anuncios" onQuitar={() => setSoloAnuncios(false)} />
@@ -578,6 +603,9 @@ export function ConversationList({
                         )}
                       </span>
                       <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        {espera && (
+                          <ChipEspera dto={espera.conversaciones[c.id]} minutosDueno={espera.minutosDueno} ahora={ahora} />
+                        )}
                         {termometro && (
                           <ChipsTermometro dto={termometro.conversaciones[c.id]} etiquetas={termometro.etiquetas} />
                         )}

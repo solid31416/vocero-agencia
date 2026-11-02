@@ -78,6 +78,12 @@ export const envSchema = z.object({
   // Ajustes → IA; la bandeja filtra por ellas. Apagado por defecto.
   // Ej.: TERMOMETRO_CLIENTE=on
   TERMOMETRO_CLIENTE: z.string().optional(),
+  // Módulo de la agencia: «Nadie ha contestado». Con la IA pausada, la bandeja
+  // muestra cuánto lleva esperando cada cliente; si nadie contesta, se le avisa
+  // al cliente (una vez por traspaso, con texto de fuera de horario) y al dueño
+  // por WhatsApp. Se configura en Ajustes → IA. Apagado por defecto.
+  // Ej.: ESPERA_HUMANO=on
+  ESPERA_HUMANO: z.string().optional(),
   // 015: bases de los conectores. Solo se sobreescriben para apuntar a los
   // mocks en el self-test; en producción se usan las reales.
   ZOOM_BASE_URL: z.string().url().default("https://api.zoom.us/v2"),

@@ -30,6 +30,7 @@ import { AgendarCita } from "./agendar-cita";
 import { AvisoReactivar } from "./aviso-reactivar";
 import { ResumenTraspaso } from "./resumen-traspaso";
 import { TermometroBarra } from "./termometro";
+import { EsperaBarra } from "./espera";
 
 /**
  * Texto que ya salió del compositor pero cuyo POST todavía viaja. Existe solo
@@ -543,6 +544,8 @@ export function InboxClient({
             </header>
             {/* Módulo de la agencia: el resumen para quien atiende (RESUMEN_TRASPASO). */}
             <ResumenTraspaso conversation={selected} />
+            {/* Módulo de la agencia: «Nadie ha contestado» (ESPERA_HUMANO). */}
+            <EsperaBarra conversation={selected} />
             {/* Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE). */}
             <TermometroBarra conversation={selected} />
             <Composer

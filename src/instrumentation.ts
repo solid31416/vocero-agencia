@@ -29,5 +29,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: termómetro del cliente (TERMOMETRO_CLIENTE).
     const { iniciarTermometro } = await import("./server/termometro/clasificar");
     iniciarTermometro();
+    // Módulo de la agencia: «Nadie ha contestado» (ESPERA_HUMANO).
+    const { iniciarEsperaHumano } = await import("./server/espera-humano/revisar");
+    iniciarEsperaHumano();
   }
 }
