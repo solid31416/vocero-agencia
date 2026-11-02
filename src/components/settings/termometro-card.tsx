@@ -65,7 +65,10 @@ export function TermometroCard() {
     const cuerpo = {
       activo,
       criterio,
-      etiquetas: etiquetas.map(({ nombre, descripcion, color }) => ({ nombre, descripcion, color })),
+      // Las que se quedaron sin nombre (un «Agregar» de más) simplemente no se guardan.
+      etiquetas: etiquetas
+        .filter((e) => e.nombre.trim())
+        .map(({ nombre, descripcion, color }) => ({ nombre, descripcion, color })),
       ...cambios,
     };
     const res = await fetch("/api/settings/termometro", {
@@ -107,8 +110,6 @@ export function TermometroCard() {
   function cambiar(k: string, campo: Partial<EtiquetaEditable>) {
     setEtiquetas((es) => es.map((e) => (e.llave === k ? { ...e, ...campo } : e)));
   }
-
-  const nombresVacios = etiquetas.some((e) => !e.nombre.trim());
 
   return (
     <Card className="max-w-2xl" data-termometro-card>
@@ -225,7 +226,7 @@ export function TermometroCard() {
 
           <div className="flex flex-wrap items-center gap-2">
             {editable && (
-              <Button size="sm" onClick={() => void guardar()} disabled={guardando || nombresVacios}>
+              <Button size="sm" onClick={() => void guardar()} disabled={guardando}>
                 {guardando ? "Guardando…" : "Guardar"}
               </Button>
             )}
