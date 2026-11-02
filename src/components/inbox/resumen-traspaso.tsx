@@ -8,9 +8,10 @@ import { RENGLONES, textoMotivo, type ResumenDto } from "@/lib/resumen-traspaso"
 
 /**
  * Módulo de la agencia (Treviño AI) — Resumen para quien atiende, arriba del
- * chat. Sale cuando la IA está pausada (el agente la pasó o alguien la pausó)
- * o cuando ya hay un resumen; con la IA contestando queda plegado. Sin la
- * bandera (404) o apagado en Ajustes → IA, no se dibuja nada.
+ * chat. Solo se ve mientras la IA está pausada (el agente la pasó o alguien
+ * la pausó): en cuanto se reactiva la IA, el caso se dio por resuelto y
+ * desaparece. El siguiente traspaso arma uno nuevo. Sin la bandera (404) o
+ * apagado en Ajustes → IA, no se dibuja nada.
  */
 
 type Estado = { activo: boolean; resumen: ResumenDto | null; generando: boolean };
@@ -71,7 +72,8 @@ export function ResumenTraspaso({ conversation }: { conversation: ConversationDt
   if (!estado?.activo) return null;
   const { resumen } = estado;
   const ocupado = armando || estado.generando;
-  if (!resumen && !pausada && !ocupado) return null;
+  // Con la IA contestando otra vez, ya no hace falta: el cliente ya se atendió.
+  if (!pausada && !ocupado) return null;
 
   return (
     <div
