@@ -31,6 +31,7 @@ export function AppShell({
   apariencia,
   commit,
   agenda = false,
+  pedidos = false,
   kicker,
   aviso = null,
   children,
@@ -43,6 +44,8 @@ export function AppShell({
   commit?: ResolvedCommit;
   /** 015 — ¿esta instancia tiene agenda? Lo decide el servidor. */
   agenda?: boolean;
+  /** Módulo de la agencia: «Pedidos» en el menú (bandera PEDIDOS). */
+  pedidos?: boolean;
   /** 028 — La etiqueta bajo el logo (`navKicker`). */
   kicker?: string;
   /**
@@ -95,6 +98,7 @@ export function AppShell({
         role={role}
         apariencia={apariencia}
         agenda={agenda}
+        pedidos={pedidos}
         kicker={kicker}
         open={navOpen}
         onClose={() => setNavOpen(false)}
@@ -117,7 +121,7 @@ export function AppShell({
         {/* 056 — El tiempo real caído se ve desde cualquier pantalla. */}
         <BandaSinConexion />
         {/* 055 — Ctrl+K y «?» desde cualquier pantalla. */}
-        <AtajosGlobales agenda={agenda} role={role} />
+        <AtajosGlobales agenda={agenda} pedidos={pedidos} role={role} />
 
         {/* La Bandeja trae sus propias tarjetas (lista, hilo, panel); el resto
             de las pantallas vive en una sola. */}

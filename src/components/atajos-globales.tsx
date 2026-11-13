@@ -28,7 +28,15 @@ type Resultado =
 
 const MAX_CONVERSACIONES = 8;
 
-export function AtajosGlobales({ agenda, role }: { agenda: boolean; role: string }) {
+export function AtajosGlobales({
+  agenda,
+  pedidos = false,
+  role,
+}: {
+  agenda: boolean;
+  pedidos?: boolean;
+  role: string;
+}) {
   const [abierto, setAbierto] = useState<"barra" | "ayuda" | null>(null);
 
   useEffect(() => {
@@ -48,7 +56,7 @@ export function AtajosGlobales({ agenda, role }: { agenda: boolean; role: string
   }, []);
 
   if (abierto === "barra") {
-    return <BarraDeComandos agenda={agenda} role={role} onClose={() => setAbierto(null)} />;
+    return <BarraDeComandos agenda={agenda} pedidos={pedidos} role={role} onClose={() => setAbierto(null)} />;
   }
   if (abierto === "ayuda") return <AyudaAtajos onClose={() => setAbierto(null)} />;
   return null;
@@ -69,10 +77,12 @@ function Velo({ onClose, children }: { onClose: () => void; children: React.Reac
 
 function BarraDeComandos({
   agenda,
+  pedidos,
   role,
   onClose,
 }: {
   agenda: boolean;
+  pedidos: boolean;
   role: string;
   onClose: () => void;
 }) {
@@ -102,7 +112,7 @@ function BarraDeComandos({
   }, []);
 
   const resultados = useMemo<Resultado[]>(() => {
-    const pantallas = [...appNavGroups({ agenda, role }).flatMap((g) => g.items), SETTINGS_ITEM]
+    const pantallas = [...appNavGroups({ agenda, pedidos, role }).flatMap((g) => g.items), SETTINGS_ITEM]
       .filter((item) => matchesQuery(q, { text: [item.label] }))
       .map((item) => ({ clase: "pantalla" as const, item }));
     const convs = conversaciones
@@ -110,7 +120,7 @@ function BarraDeComandos({
       .slice(0, MAX_CONVERSACIONES)
       .map((conv) => ({ clase: "conversacion" as const, conv }));
     return [...pantallas, ...convs];
-  }, [q, conversaciones, agenda, role]);
+  }, [q, conversaciones, agenda, pedidos, role]);
 
   useEffect(() => setActivo(0), [q]);
   useEffect(() => {

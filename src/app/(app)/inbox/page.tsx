@@ -6,6 +6,7 @@ import { enabledChannels } from "@/server/channels/enabled";
 import { agendaEnabled } from "@/server/agenda/flag";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { seguimientoEnabled } from "@/server/seguimiento/flag";
+import { pedidosEnabled } from "@/server/pedidos/flag";
 import { avisoReactivarEnabled } from "@/server/inbox/aviso-reactivar-flag";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +33,7 @@ export default async function InboxPage() {
       agenda={agendaEnabled()}
       cotizaciones={cotizacionesEnabled()}
       seguimiento={seguimientoEnabled()}
+      pedidos={pedidosEnabled()}
       avisarAlReactivar={avisoReactivarEnabled()}
     />
   );

@@ -4,6 +4,7 @@ import {
   FlaskConical,
   Inbox,
   Kanban,
+  Package,
   ListChecks,
   Settings,
   Sparkles,
@@ -49,8 +50,11 @@ export const SETTINGS_ITEM: NavItem = {
  */
 export function appNavGroups({
   agenda = false,
+  pedidos = false,
   role,
 }: {
+  /** Módulo de la agencia: «Pedidos» solo con la bandera PEDIDOS. */
+  pedidos?: boolean;
   /** 015 — "Citas" solo existe si esta instancia encendió la agenda. */
   agenda?: boolean;
   /** #86 — La guía de inicio solo para quien puede configurar. */
@@ -64,6 +68,7 @@ export function appNavGroups({
   // Citas va después de Contactos: es el paso siguiente de un trato, no una
   // sección aparte.
   if (agenda) trabajo.push({ href: "/bookings", label: "Citas", icon: CalendarDays });
+  if (pedidos) trabajo.push({ href: "/pedidos", label: "Pedidos", icon: Package });
 
   const agente: NavItem[] = [];
   // Un miembro del equipo no puede hacer ninguno de los pasos de la guía.
@@ -107,7 +112,10 @@ export function settingsSections({
   tiktok = false,
   cotizaciones = false,
   seguimiento = false,
+  pedidos = false,
 }: {
+  /** Módulo de la agencia: Ajustes → Pedidos con la bandera PEDIDOS. */
+  pedidos?: boolean;
   /** Módulo de la agencia: «Cotizaciones» solo con la bandera COTIZACIONES. */
   cotizaciones?: boolean;
   /** Módulo de la agencia: «Seguimiento» solo con la bandera SEGUIMIENTO_AUTOMATICO. */
@@ -149,6 +157,7 @@ export function settingsSections({
   ];
   if (atribucion) negocio.push({ href: "/settings/ads", label: "Anuncios" });
   if (cotizaciones) negocio.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
+  if (pedidos) negocio.push({ href: "/settings/pedidos", label: "Pedidos" });
 
   return [
     { title: "Canales", links: canales },

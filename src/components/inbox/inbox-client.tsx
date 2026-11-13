@@ -29,6 +29,7 @@ import { IaRapida } from "./ia-rapida";
 import { AgendarCita } from "./agendar-cita";
 import { Cotizar } from "./cotizar";
 import { SeguimientoPill } from "@/components/inbox/seguimiento-pill";
+import { PedidoPill } from "@/components/inbox/pedido-pill";
 import { AvisoReactivar } from "./aviso-reactivar";
 import { ResumenTraspaso } from "./resumen-traspaso";
 import { TermometroBarra } from "./termometro";
@@ -64,7 +65,10 @@ export function InboxClient({
   avisarAlReactivar = false,
   cotizaciones = false,
   seguimiento = false,
+  pedidos = false,
 }: {
+  /** Módulo de la agencia: «Pedido» en el encabezado (bandera PEDIDOS). */
+  pedidos?: boolean;
   /** Módulo de la agencia: botón «Cotizar» en el encabezado (bandera COTIZACIONES). */
   cotizaciones?: boolean;
   /** Módulo de la agencia: estado del seguimiento automático (SEGUIMIENTO_AUTOMATICO). */
@@ -514,6 +518,7 @@ export function InboxClient({
                         }}
                       />
                     )}
+                    {pedidos && <PedidoPill conversation={selected} puedeBorrar={canDelete} />}
                     {seguimiento && <SeguimientoPill conversation={selected} />}
                     {agenda && (
                       <AgendarCita

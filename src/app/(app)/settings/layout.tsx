@@ -4,6 +4,7 @@ import { atribucionEnabled } from "@/server/attribution/flag";
 import { isChannelEnabled } from "@/server/channels/enabled";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { seguimientoEnabled } from "@/server/seguimiento/flag";
+import { pedidosEnabled } from "@/server/pedidos/flag";
 
 // La bandera se lee en cada petición: si esto se resolviera al construir, la
 // imagen quedaría con la agenda apagada para siempre y encenderla en la
@@ -28,6 +29,7 @@ export default function SettingsLayout({
           tiktok={isChannelEnabled("tiktok")}
           cotizaciones={cotizacionesEnabled()}
           seguimiento={seguimientoEnabled()}
+          pedidos={pedidosEnabled()}
         />
         <div className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6">{children}</div>
       </div>
