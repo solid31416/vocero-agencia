@@ -28,11 +28,9 @@ export const rangoSchema = z
 export type Rango = z.infer<typeof rangoSchema>;
 export type Horario = Partial<Record<Dia, Rango[]>>;
 
-export const horarioSchema = z.record(z.enum(DIAS), z.array(rangoSchema).max(4)) as unknown as z.ZodType<
-  Horario,
-  z.ZodTypeDef,
-  unknown
->;
+// zod 4: `partialRecord` deja faltar días (con `record` y llaves de enum, zod 4
+// exige los siete).
+export const horarioSchema: z.ZodType<Horario> = z.partialRecord(z.enum(DIAS), z.array(rangoSchema).max(4));
 
 export const HORARIO_POR_DEFECTO: Horario = {
   mon: [{ start: "09:00", end: "18:00" }],
