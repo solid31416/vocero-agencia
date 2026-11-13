@@ -32,5 +32,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: «Nadie ha contestado» (ESPERA_HUMANO).
     const { iniciarEsperaHumano } = await import("./server/espera-humano/revisar");
     iniciarEsperaHumano();
+    // Módulo de la agencia: seguimiento automático 3/7/30 días (SEGUIMIENTO_AUTOMATICO).
+    const { iniciarSeguimiento } = await import("./server/seguimiento/worker");
+    iniciarSeguimiento();
   }
 }

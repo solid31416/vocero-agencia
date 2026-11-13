@@ -28,6 +28,7 @@ import { ContactPanel } from "./contact-panel";
 import { IaRapida } from "./ia-rapida";
 import { AgendarCita } from "./agendar-cita";
 import { Cotizar } from "./cotizar";
+import { SeguimientoPill } from "@/components/inbox/seguimiento-pill";
 import { AvisoReactivar } from "./aviso-reactivar";
 import { ResumenTraspaso } from "./resumen-traspaso";
 import { TermometroBarra } from "./termometro";
@@ -62,9 +63,12 @@ export function InboxClient({
   agenda = false,
   avisarAlReactivar = false,
   cotizaciones = false,
+  seguimiento = false,
 }: {
   /** Módulo de la agencia: botón «Cotizar» en el encabezado (bandera COTIZACIONES). */
   cotizaciones?: boolean;
+  /** Módulo de la agencia: estado del seguimiento automático (SEGUIMIENTO_AUTOMATICO). */
+  seguimiento?: boolean;
   channels: readonly Channel[];
   /** 026 — Eliminar es irreversible: solo quien administra ve la opción. */
   canDelete?: boolean;
@@ -510,6 +514,7 @@ export function InboxClient({
                         }}
                       />
                     )}
+                    {seguimiento && <SeguimientoPill conversation={selected} />}
                     {agenda && (
                       <AgendarCita
                         conversation={selected}

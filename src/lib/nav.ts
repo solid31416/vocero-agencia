@@ -106,9 +106,12 @@ export function settingsSections({
   messenger = false,
   tiktok = false,
   cotizaciones = false,
+  seguimiento = false,
 }: {
   /** Módulo de la agencia: «Cotizaciones» solo con la bandera COTIZACIONES. */
   cotizaciones?: boolean;
+  /** Módulo de la agencia: «Seguimiento» solo con la bandera SEGUIMIENTO_AUTOMATICO. */
+  seguimiento?: boolean;
   agenda?: boolean;
   /** 016 — "Anuncios" existe solo con la bandera ATRIBUCION. */
   atribucion?: boolean;
@@ -133,6 +136,7 @@ export function settingsSections({
   // #85 — el proveedor de IA se configura aquí; el entorno queda de respaldo.
   const agente: SettingsLink[] = [{ href: "/settings/ai", label: "IA" }];
   if (agenda) agente.push({ href: "/settings/calendar", label: "Agenda" });
+  if (seguimiento) agente.push({ href: "/settings/seguimiento", label: "Seguimiento" });
 
   const negocio: SettingsLink[] = [
     { href: "/settings/branding", label: "Marca" },
