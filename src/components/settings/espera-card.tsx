@@ -5,6 +5,7 @@ import { Timer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -128,12 +129,12 @@ export function EsperaCard() {
               <>
                 <div className="flex items-center gap-2 text-sm">
                   <span>Si nadie contesta en</span>
-                  <Input
-                    type="number"
+                  <NumeroInput
+                    entero
                     min={1}
                     max={240}
                     value={borrador.minutosCliente}
-                    onChange={(e) => cambiar({ minutosCliente: Number(e.target.value) || 1 })}
+                    onValueChange={(n) => cambiar({ minutosCliente: Math.round(n) })}
                     disabled={!editable}
                     className="w-20"
                     aria-label="Minutos antes de avisarle al cliente"
@@ -232,12 +233,12 @@ export function EsperaCard() {
             </div>
             <div className="flex items-center gap-2 text-sm">
               <span>{borrador.avisarDueno ? "Avísame si alguien lleva" : "En rojo cuando alguien lleva"}</span>
-              <Input
-                type="number"
+              <NumeroInput
+                entero
                 min={1}
                 max={1440}
                 value={borrador.minutosDueno}
-                onChange={(e) => cambiar({ minutosDueno: Number(e.target.value) || 1 })}
+                onValueChange={(n) => cambiar({ minutosDueno: Math.round(n) })}
                 disabled={!editable}
                 className="w-20"
                 aria-label="Minutos antes de avisarte"

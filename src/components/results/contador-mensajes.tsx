@@ -6,6 +6,7 @@ import { ArrowLeft, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Section } from "@/components/results/section";
 import {
@@ -401,14 +402,13 @@ export function ContadorMensajes() {
                     {CATEGORIAS.map((c) => (
                       <label key={c} className="space-y-1 text-xs">
                         <span className="block text-text-2">{NOMBRE_CATEGORIA[c]}</span>
-                        <Input
-                          type="number"
+                        <NumeroInput
                           step="0.0001"
                           min={0}
                           value={config.tarifas[c]}
                           disabled={!d.puedeEditar}
-                          onChange={(e) =>
-                            setConfig({ ...config, tarifas: { ...config.tarifas, [c]: Number(e.target.value) } })
+                          onValueChange={(n) =>
+                            setConfig({ ...config, tarifas: { ...config.tarifas, [c]: n } })
                           }
                         />
                       </label>

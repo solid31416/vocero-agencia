@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
@@ -217,8 +218,8 @@ export function CotizacionesClient() {
                   <li key={p.id} className="grid gap-2 rounded-md border p-3 sm:grid-cols-[1fr_7rem_6rem_auto]">
                     <Input aria-label="Nombre del producto" placeholder="Nombre" value={p.nombre} disabled={!editable}
                       onChange={(e) => cambiarProducto(p.id, { nombre: e.target.value })} />
-                    <Input aria-label="Precio" type="number" min={0} step="0.01" value={p.precio} disabled={!editable}
-                      onChange={(e) => cambiarProducto(p.id, { precio: Number(e.target.value) })} />
+                    <NumeroInput aria-label="Precio" min={0} step="0.01" value={p.precio} disabled={!editable}
+                      onValueChange={(n) => cambiarProducto(p.id, { precio: n })} />
                     <Input aria-label="Unidad" placeholder="pieza" value={p.unidad} disabled={!editable}
                       onChange={(e) => cambiarProducto(p.id, { unidad: e.target.value })} />
                     {editable ? (
@@ -395,8 +396,8 @@ function Numero(props: {
   return (
     <div className="space-y-1.5">
       <Label htmlFor={id}>{props.label}</Label>
-      <Input id={id} type="number" min={props.min} max={props.max} value={props.value} disabled={props.disabled}
-        onChange={(e) => props.onChange(Number(e.target.value))} />
+      <NumeroInput id={id} min={props.min} max={props.max} value={props.value} disabled={props.disabled}
+        onValueChange={props.onChange} />
     </div>
   );
 }

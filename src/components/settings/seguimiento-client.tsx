@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -140,13 +141,13 @@ export function SeguimientoClient() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">Paso {i + 1}:</span>
                     <span className="text-sm text-muted-foreground">a los</span>
-                    <Input
-                      type="number"
+                    <NumeroInput
+                      entero
                       min={MIN_DIAS}
                       max={MAX_DIAS}
                       value={p.dias}
                       disabled={!editable}
-                      onChange={(e) => cambiarPaso(i, { dias: Math.round(Number(e.target.value) || MIN_DIAS) })}
+                      onValueChange={(n) => cambiarPaso(i, { dias: Math.round(n) })}
                       className="w-20"
                       aria-label={`Días del paso ${i + 1}`}
                     />

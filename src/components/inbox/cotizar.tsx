@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { ConversationDto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -294,25 +295,23 @@ function VentanaCotizar({
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-text-3">Cantidad</Label>
-                    <Input
+                    <NumeroInput
                       aria-label="Cantidad"
-                      type="number"
                       min={1}
                       step="any"
                       value={p.cantidad}
-                      onChange={(e) => cambiarPartida(i, { cantidad: Number(e.target.value) })}
+                      onValueChange={(n) => cambiarPartida(i, { cantidad: n })}
                     />
                   </div>
                   <div className="space-y-1">
                     <Label className="text-[11px] text-text-3">Precio unitario</Label>
-                    <Input
+                    <NumeroInput
                       aria-label="Precio unitario"
-                      type="number"
                       min={0}
                       step="0.01"
                       value={p.precio}
                       className={cn(p.concepto.trim() && p.precio <= 0 && "border-danger-text")}
-                      onChange={(e) => cambiarPartida(i, { precio: Number(e.target.value) })}
+                      onValueChange={(n) => cambiarPartida(i, { precio: n })}
                     />
                   </div>
                   <Button
@@ -344,13 +343,12 @@ function VentanaCotizar({
             <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
               <div className="space-y-1.5">
                 <Label htmlFor="cot-descuento">Descuento (%)</Label>
-                <Input
+                <NumeroInput
                   id="cot-descuento"
-                  type="number"
                   min={0}
                   max={100}
                   value={descuentoPct}
-                  onChange={(e) => setDescuentoPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                  onValueChange={(n) => setDescuentoPct(Math.min(100, Math.max(0, n)))}
                 />
               </div>
               <div className="space-y-1.5">
