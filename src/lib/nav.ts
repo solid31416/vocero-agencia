@@ -113,7 +113,10 @@ export function settingsSections({
   cotizaciones = false,
   seguimiento = false,
   pedidos = false,
+  cuenta = false,
 }: {
+  /** Módulo de la agencia: «Tu cuenta → Contraseña» (el layout de Ajustes la enciende siempre). */
+  cuenta?: boolean;
   /** Módulo de la agencia: Ajustes → Pedidos con la bandera PEDIDOS. */
   pedidos?: boolean;
   /** Módulo de la agencia: «Cotizaciones» solo con la bandera COTIZACIONES. */
@@ -159,11 +162,15 @@ export function settingsSections({
   if (cotizaciones) negocio.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
   if (pedidos) negocio.push({ href: "/settings/pedidos", label: "Pedidos" });
 
-  return [
+  const secciones: SettingsSection[] = [
     { title: "Canales", links: canales },
     { title: "Agente", links: agente },
     { title: "Negocio", links: negocio },
   ];
+  if (cuenta) {
+    secciones.push({ title: "Tu cuenta", links: [{ href: "/settings/cuenta", label: "Contraseña" }] });
+  }
+  return secciones;
 }
 
 /** Activa si la ruta es la entrada o cuelga de ella (`/inbox/cv_123`). */
