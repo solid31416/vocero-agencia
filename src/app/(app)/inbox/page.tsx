@@ -4,6 +4,7 @@ import { getSessionOrNull } from "@/lib/auth/session";
 import { CHANNEL_ORDER } from "@/lib/channels";
 import { enabledChannels } from "@/server/channels/enabled";
 import { agendaEnabled } from "@/server/agenda/flag";
+import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { avisoReactivarEnabled } from "@/server/inbox/aviso-reactivar-flag";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function InboxPage() {
       channels={channels}
       canDelete={canConfigure(session?.role)}
       agenda={agendaEnabled()}
+      cotizaciones={cotizacionesEnabled()}
       avisarAlReactivar={avisoReactivarEnabled()}
     />
   );

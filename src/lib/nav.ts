@@ -105,7 +105,10 @@ export function settingsSections({
   instagram = false,
   messenger = false,
   tiktok = false,
+  cotizaciones = false,
 }: {
+  /** Módulo de la agencia: «Cotizaciones» solo con la bandera COTIZACIONES. */
+  cotizaciones?: boolean;
   agenda?: boolean;
   /** 016 — "Anuncios" existe solo con la bandera ATRIBUCION. */
   atribucion?: boolean;
@@ -141,6 +144,7 @@ export function settingsSections({
     { href: "/settings/team", label: "Equipo" },
   ];
   if (atribucion) negocio.push({ href: "/settings/ads", label: "Anuncios" });
+  if (cotizaciones) negocio.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
 
   return [
     { title: "Canales", links: canales },

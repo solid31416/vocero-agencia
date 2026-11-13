@@ -21,7 +21,9 @@ export function SettingsNav({
   instagram = false,
   messenger = false,
   tiktok = false,
+  cotizaciones = false,
 }: {
+  cotizaciones?: boolean;
   agenda?: boolean;
   atribucion?: boolean;
   instagram?: boolean;
@@ -29,7 +31,7 @@ export function SettingsNav({
   tiktok?: boolean;
 }) {
   const pathname = usePathname();
-  const sections = settingsSections({ agenda, atribucion, instagram, messenger, tiktok });
+  const sections = settingsSections({ agenda, atribucion, instagram, messenger, tiktok, cotizaciones });
   return (
     <nav
       aria-label="Ajustes"
