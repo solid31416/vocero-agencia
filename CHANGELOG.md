@@ -5,6 +5,127 @@ sigue el SemVer del [README](README.md#versiones): una menor trae funciones
 nuevas y actualizar es redesplegar. Desde 1.4.0, cada tag `vX.Y.Z` publica la
 imagen `ghcr.io/kevinrivm/vocero-crm:X.Y.Z`.
 
+## Sin publicar
+
+### Nuevo
+
+- **«Conectar con Meta» (Embedded Signup v4)** en Ajustes → WhatsApp (spec
+  066). Con `META_APP_ID`, `META_EMBEDDED_CONFIG_ID` y `META_APP_SECRET` en la
+  instancia, quien administra la cuenta autoriza su WhatsApp en la ventana
+  oficial de Meta y Vocero registra el número (con un PIN generado si no
+  escribes uno), guarda las credenciales cifradas y registra el webhook en la
+  Cuenta de WhatsApp, en la de mensajes y en el número. Sin esas variables
+  todo queda como antes. Pasos del panel de Meta en
+  [docs/embedded-signup.md](docs/embedded-signup.md). Sin migración.
+
+### Arreglado
+
+- **`#100/2388339` al suscribir la app en la Cuenta de WhatsApp ya no es
+  fatal** si la Cuenta de mensajes quedó suscrita: desde el 28-oct-2026 Meta
+  lo responde en las cuentas partidas, y el registro del webhook se cortaba
+  antes de poner el override del número.
+
+## 2.7.0 — 2026-10-29
+
+Conectar el número con la ventana oficial de Meta. Actualizar es redesplegar con
+la etiqueta `2.7.0`: no hay migraciones. Las variables nuevas son opcionales y,
+sin ellas, todo queda como en la 2.6. Nea no cambia.
+
+### Nuevo
+
+- **«Conectar con Meta» en Ajustes → WhatsApp** (#187, spec 066). Abre el
+  Embedded Signup v4 de Meta (Facebook Login for Business) y deja el número
+  conectado sin pegar credenciales: canjea el `code`, comprueba que el número
+  sea de la WABA, lo registra si hace falta (PIN del dueño o uno generado que
+  se muestra una sola vez), guarda las credenciales cifradas y registra el
+  webhook en la Cuenta de WhatsApp y en la Cuenta de mensajes. Solo para
+  `owner`/`admin`. Sin coexistencia por ahora: si Meta la ofrece, se avisa y no
+  se guarda nada. Guía del panel en [`docs/embedded-signup.md`](docs/embedded-signup.md).
+- **Variables** `META_APP_ID` y `META_EMBEDDED_CONFIG_ID`, más `META_APP_SECRET`
+  de la misma app. Si falta cualquiera, el botón no aparece y queda el
+  formulario manual.
+
+### Arreglado
+
+- **El `#100/2388339` al suscribir la app en la Cuenta de WhatsApp ya no es
+  error** si la Cuenta de mensajes respondió bien (#187). Meta dejó de aceptar
+  `subscribed_apps` en la Cuenta de WhatsApp después del split; en la 2.6
+  guardar la conexión mostraba un aviso rojo aunque el webhook funcionara.
+
+## 2.6.1 — 2026-10-29
+
+Mantenimiento. Actualizar es redesplegar con la etiqueta `2.6.1`: no hay
+migraciones ni variables nuevas. Nea no cambia.
+
+### Seguridad
+
+- **zod 4 en la app** (#184). El zod 3 caía en GHSA-mrhx-c7xc-m3w5 (agotar
+  la memoria al validar colecciones grandes) y la rama 3.x no tiene parche. Era
+  el pendiente de la 2.5.3. Los mensajes de error por defecto de una petición
+  inválida (el `message` del 422) cambian de redacción.
+
+### Arreglado
+
+- **El build ya no depende de Google Fonts** (#183). Las seis familias viven
+  en el repo (`src/app/fonts`, licencia OFL) con `next/font/local`; antes un
+  hipo de la red de Google tumbaba el build. Quien construye desde el código
+  ya no necesita salida a internet para las fuentes.
+
+## 2.6.0 — 2026-10-29
+
+Plantillas que funcionan con el split de Meta de 2026, y las que creaste fuera
+de Vocero ya aparecen. Actualizar es redesplegar con la etiqueta `2.6.0`: la
+migración `0026` se aplica sola al arrancar y no hay variables nuevas. Nea no
+cambia. Sin más pasos, la instancia sigue igual que en la 2.5; para usar la
+Cuenta de mensajes, sigue
+[migrar.md](specs/065-cuenta-de-mensajes/migrar.md).
+
+### Nuevo
+
+- **La Cuenta de mensajes** (065). Desde 2026 Meta separa la cuenta de
+  WhatsApp (el número) de la Cuenta de mensajes (plantillas y pago).
+  - Ajustes → WhatsApp tiene un campo opcional para su ID. Si lo dejas vacío,
+    Vocero intenta encontrarla.
+  - Las plantillas se crean y se sincronizan ahí, y el webhook se registra en
+    las dos cuentas. Sin él, en las cuentas ya separadas los mensajes
+    entrantes podían no llegar.
+  - El aviso de estado de una plantilla llega por cualquiera de las dos.
+  - Al desconectar, se quita también de la Cuenta de mensajes.
+- **Sincronizar importa las plantillas creadas fuera de Vocero** (065):
+  `hello_world` y las del Administrador de WhatsApp. Solo las que Vocero sabe
+  enviar: cuerpo con variables, encabezado de texto fijo, pie y botones sin
+  variables. Las de encabezado con imagen, URL dinámica o autenticación se
+  quedan fuera. Recorre todas las páginas, no solo la primera.
+
+### Arreglado
+
+- **Crear una plantilla ya no falla con «Invalid parameter»** en una cuenta
+  partida (Meta responde `#100`/`2388339` en la cuenta de WhatsApp). Si aún
+  no guardaste la Cuenta de mensajes, el error dice dónde agregarla.
+
+## 2.5.3 — 2026-10-28
+
+Una versión de seguridad: **actualiza cuanto antes**. Actualizar es
+redesplegar con la etiqueta `2.5.3`: no hay migraciones ni variables nuevas.
+Nea no cambia. Si construyes desde el código, reconstruye la imagen (la base
+de Node también cambia).
+
+### Seguridad
+
+- **Next.js 15.5.28 y sharp 0.35.5** (#171). Cierran un RCE sin autenticación
+  en el optimizador de imágenes con SVG (CVE-2026-96889 /
+  GHSA-2464-fhr4-w9xw) y un DoS en Server Actions (GHSA-p3m5-59mp-jv5r).
+- **Node 22.23.4** como imagen base, fijada en las tres etapas del
+  `Dockerfile`. Cierra el fallo del decodificador Brotli (CVE-2026-111497) y
+  el resto de la tanda del 21-oct.
+- **drizzle-orm 0.45.4** (y drizzle-kit 0.31.11). Cierra la inyección SQL en
+  identificadores (CVE-2026-39356); el código de Vocero no la exponía.
+- **zod 4.6.7** dentro de better-auth (GHSA-mrhx-c7xc-m3w5). El zod 3 de la
+  app no tiene parche: sus arrays van detrás de sesión o de `BOT_API_KEY`, y
+  migrar a zod 4 irá aparte.
+
+Gracias a Denys (@revudev) por el PR.
+
 ## 2.5.2 — 2026-10-27
 
 Una Bandeja rápida con muchos mensajes. Actualizar es redesplegar con la

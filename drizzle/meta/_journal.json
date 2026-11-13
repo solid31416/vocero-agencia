@@ -183,6 +183,13 @@
       "when": 1792779395979,
       "tag": "0025_conversation_note",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1793222749562,
+      "tag": "0026_cuenta_de_mensajes",
+      "breakpoints": true
     }
   ]
 }
