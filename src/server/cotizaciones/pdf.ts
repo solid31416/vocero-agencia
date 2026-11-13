@@ -210,7 +210,8 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
       ancho: UTIL + MARGEN - col.importe - 6,
     });
     y -= alto;
-    pagina.drawLine({ start: { x: MARGEN, y: y + 6 }, end: { x: MARGEN + UTIL, y: y + 6 }, thickness: 0.6, color: linea });
+    // Entre el renglón de abajo de esta partida y el de arriba de la siguiente.
+    pagina.drawLine({ start: { x: MARGEN, y: y + 14 }, end: { x: MARGEN + UTIL, y: y + 14 }, thickness: 0.6, color: linea });
   }
 
   // ---------------------------------------------------------------- totales
@@ -235,6 +236,7 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
   const xEtiq = MARGEN + UTIL - 230;
   for (const [etiq, valor, fuerte] of filas) {
     if (fuerte) {
+      y -= 6; // aire para que la barra no toque el renglón de arriba
       pagina.drawRectangle({ x: xEtiq - 8, y: y - 6, width: 238, height: 20, color: acento });
       texto(etiq, xEtiq, y, { f: negrita, t: 10.5, c: rgb(1, 1, 1) });
       texto(valor, xEtiq, y, { f: negrita, t: 10.5, c: rgb(1, 1, 1), alinear: "der", ancho: 224 });
