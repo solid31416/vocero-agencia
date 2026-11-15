@@ -75,6 +75,8 @@ export const partidaSchema = z.object({
 });
 export type Partida = z.infer<typeof partidaSchema>;
 
+export const MAX_CLIENTE = 120;
+
 export const cotizacionInputSchema = z.object({
   conversationId: z.string().trim().min(1),
   partidas: z
@@ -83,6 +85,11 @@ export const cotizacionInputSchema = z.object({
     .max(MAX_PARTIDAS, `Máximo ${MAX_PARTIDAS} partidas`),
   descuentoPct: z.coerce.number().min(0).max(100).default(0),
   notas: z.string().trim().max(1000).default(""),
+  /**
+   * A nombre de quién sale (PDF y mensaje). Vacío = el nombre del contacto,
+   * que suele ser el de su perfil de WhatsApp («J», un apodo, un emoji).
+   */
+  cliente: z.string().trim().max(MAX_CLIENTE).default(""),
 });
 export type CotizacionInput = z.infer<typeof cotizacionInputSchema>;
 
@@ -194,7 +201,8 @@ export type CotizacionDto = {
 export const PROMPT_SUGERENCIA = [
   "Armas el BORRADOR de una cotización a partir de una conversación de WhatsApp entre un negocio y su cliente.",
   "Devuelve SOLO JSON con esta forma:",
-  '{"partidas":[{"productoId":"id de la lista o null","concepto":"nombre del producto o servicio","cantidad":1}],"notas":"aclaraciones para el cliente, o vacío"}',
+  '{"cliente":"nombre del cliente, o vacío","partidas":[{"productoId":"id de la lista o null","concepto":"nombre del producto o servicio","cantidad":1}],"notas":"aclaraciones para el cliente, o vacío"}',
+  "Regla del cliente: el nombre con el que el cliente SE PRESENTÓ en la plática (nombre y apellido si los dio; si habla por una empresa, «Nombre — Empresa»). No uses su nombre de perfil ni lo inventes: si no lo dijo, deja cliente vacío.",
   "Reglas de las partidas:",
   "- Usa productos de la LISTA siempre que se pueda (copia su id exacto).",
   "- Si el cliente pidió algo que no está en la lista, ponlo con productoId null y un concepto claro.",
@@ -222,6 +230,7 @@ export const sugerenciaIaSchema = z.object({
     .max(MAX_PARTIDAS)
     .catch([]),
   notas: z.string().max(1000).catch(""),
+  cliente: z.string().max(MAX_CLIENTE).catch(""),
 });
 export type SugerenciaIa = z.infer<typeof sugerenciaIaSchema>;
 

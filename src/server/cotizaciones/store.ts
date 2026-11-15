@@ -252,7 +252,7 @@ export async function guardarBorrador(input: {
   const valores = {
     conversationId: input.datos.conversationId,
     contactId: contacto.contactId,
-    contactoNombre: contacto.nombre,
+    contactoNombre: input.datos.cliente || contacto.nombre,
     partidas: input.datos.partidas,
     descuentoPct: input.datos.descuentoPct,
     notas: input.datos.notas,

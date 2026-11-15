@@ -117,7 +117,7 @@ export async function sugerirPartidas(
   organizationId: string,
   conversationId: string
 ): Promise<
-  | { ok: true; partidas: Partida[]; sinPrecio: number; notas: string }
+  | { ok: true; partidas: Partida[]; sinPrecio: number; notas: string; cliente: string }
   | { ok: false; status: number; codigo: string; detalle: string }
 > {
   const config = await leerConfig(organizationId);
@@ -167,5 +167,5 @@ export async function sugerirPartidas(
   if (partidas.length === 0) {
     return { ok: false, status: 422, codigo: "nada", detalle: "La IA no encontró qué cotizar en esta conversación" };
   }
-  return { ok: true, partidas, sinPrecio, notas: sugerencia.notas.trim() };
+  return { ok: true, partidas, sinPrecio, notas: sugerencia.notas.trim(), cliente: sugerencia.cliente.trim() };
 }

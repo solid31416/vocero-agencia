@@ -66,6 +66,23 @@ describe("cotizaciones — totales", () => {
   });
 });
 
+describe("cotizaciones — a nombre de quién sale", () => {
+  it("sin nombre escrito queda vacío (y el CRM usa el del contacto)", () => {
+    const base = { conversationId: "cv_1", partidas: [{ concepto: "Domo", cantidad: 1, precio: 10 }] };
+    expect(cotizacionInputSchema.parse(base).cliente).toBe("");
+    expect(cotizacionInputSchema.parse({ ...base, cliente: "  Saúl Garza  " }).cliente).toBe("Saúl Garza");
+  });
+
+  it("la IA propone el nombre que el cliente dio, nunca el del perfil", () => {
+    expect(sugerenciaIaSchema.parse({ partidas: [], cliente: "Saúl — Casas y Cabañas" }).cliente).toBe(
+      "Saúl — Casas y Cabañas"
+    );
+    expect(sugerenciaIaSchema.parse({ partidas: [] }).cliente).toBe("");
+    expect(PROMPT_SUGERENCIA).toMatch(/SE PRESENTÓ/);
+    expect(PROMPT_SUGERENCIA).toMatch(/No uses su nombre de perfil/);
+  });
+});
+
 describe("cotizaciones — las notas son para el cliente", () => {
   it("la IA las escribe para el cliente y sin nada interno", () => {
     expect(PROMPT_SUGERENCIA).toMatch(/PARA EL CLIENTE/);
@@ -104,7 +121,7 @@ describe("cotizaciones — la IA no pone precios", () => {
   });
 
   it("una respuesta rara de la IA no truena", () => {
-    expect(sugerenciaIaSchema.parse({ partidas: "nada" })).toEqual({ partidas: [], notas: "" });
+    expect(sugerenciaIaSchema.parse({ partidas: "nada" })).toEqual({ partidas: [], notas: "", cliente: "" });
     expect(partidasDeSugerencia(sugerenciaIaSchema.parse({}), productos).partidas).toEqual([]);
   });
 });

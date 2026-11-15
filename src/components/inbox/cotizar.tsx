@@ -10,6 +10,7 @@ import { NumeroInput } from "@/components/ui/numero-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  MAX_CLIENTE,
   MAX_PARTIDAS,
   calcularTotales,
   formatoDinero,
@@ -93,6 +94,10 @@ function VentanaCotizar({
   const [partidas, setPartidas] = useState<Partida[]>([partidaVacia()]);
   const [descuentoPct, setDescuentoPct] = useState(0);
   const [notas, setNotas] = useState("");
+  // A nombre de quién sale. Arranca con el del contacto (el de su WhatsApp,
+  // salvo que alguien lo haya renombrado); la IA lo cambia por el que dio en
+  // la plática solo si nadie lo ha tocado.
+  const [cliente, setCliente] = useState(conversation.contact.name);
   const [borradorId, setBorradorId] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState<null | "ia" | "vista" | "enviar">(null);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -112,6 +117,7 @@ function VentanaCotizar({
         setPartidas(borrador.partidas);
         setDescuentoPct(borrador.descuentoPct);
         setNotas(borrador.notas);
+        setCliente(borrador.contactoNombre);
       }
     })();
   }, [conversation.id]);
@@ -159,13 +165,14 @@ function VentanaCotizar({
     }).catch(() => null);
     setOcupado(null);
     const d = (await res?.json().catch(() => null)) as
-      | { partidas?: Partida[]; sinPrecio?: number; notas?: string; error?: { message?: string } }
+      | { partidas?: Partida[]; sinPrecio?: number; notas?: string; cliente?: string; error?: { message?: string } }
       | null;
     if (!res?.ok || !d?.partidas) {
       return setAviso({ ok: false, texto: d?.error?.message ?? "La IA no pudo llenarla" });
     }
     setPartidas(d.partidas);
     if (d.notas && !notas.trim()) setNotas(d.notas);
+    if (d.cliente && (!cliente.trim() || cliente === conversation.contact.name)) setCliente(d.cliente);
     setAviso(
       d.sinPrecio
         ? { ok: false, texto: `La IA puso ${d.sinPrecio} concepto(s) que no están en tu lista: llena su precio.` }
@@ -184,6 +191,7 @@ function VentanaCotizar({
         partidas: completas,
         descuentoPct,
         notas,
+        cliente: cliente.trim(),
       }),
     }).catch(() => null);
     const d = (await res?.json().catch(() => null)) as
@@ -241,7 +249,7 @@ function VentanaCotizar({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 id="cotizar-titulo" className="text-[16px] font-bold">
-              Cotización para {conversation.contact.name}
+              Cotización para {cliente.trim() || conversation.contact.name}
             </h3>
             <p className="mt-1 text-sm text-text-3">
               Los precios salen de tu lista (Ajustes → Cotizaciones). Puedes cambiarlos aquí.
@@ -339,6 +347,22 @@ function VentanaCotizar({
                 <Plus className="mr-1 h-4 w-4" aria-hidden /> Agregar partida
               </Button>
             )}
+
+            <div className="space-y-1.5">
+              <Label htmlFor="cot-cliente">A nombre de (sale en el PDF y en el mensaje)</Label>
+              <Input
+                id="cot-cliente"
+                maxLength={MAX_CLIENTE}
+                value={cliente}
+                placeholder="Nombre del cliente o de su empresa"
+                onChange={(e) => setCliente(e.target.value)}
+              />
+              {cliente.trim() === conversation.contact.name && (
+                <p className="text-[11px] text-text-3">
+                  Es el nombre de su perfil de WhatsApp. Cámbialo por el que te dio, o deja que la IA lo llene.
+                </p>
+              )}
+            </div>
 
             <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
               <div className="space-y-1.5">
