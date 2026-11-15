@@ -26,7 +26,7 @@ export type SseEvent =
       type: "message.media";
       data: { conversationId: string; messageId: string; media: unknown };
     }
-  | { type: "conversation.updated"; data: { conversation: unknown } }
+  | { type: "conversation.updated"; data: { conversation: unknown; reiniciada?: boolean } }
   /** 026 — alguien del equipo eliminó la conversación: se quita de la bandeja. */
   | {
       type: "conversation.deleted";

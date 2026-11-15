@@ -100,7 +100,7 @@
     "/api/bot/biblioteca": {
       "post": {
         "summary": "Mandar un archivo de la Biblioteca (módulo de la agencia)",
-        "description": "Solo con la bandera `BIBLIOTECA` (sin ella, 404 vacío). Manda por la conversación una foto, video o PDF de los que trae `biblioteca` en el contexto, por su `id`. Sale como mensaje de la IA, con la ventana de 24 h abierta y solo por WhatsApp; en el Laboratorio se guarda en el hilo y no se envía. No repite un archivo el mismo día ni pasa de 6 archivos por conversación en 24 h.",
+        "description": "Solo con la bandera `BIBLIOTECA` (sin ella, 404 vacío). Manda por la conversación una foto, video o PDF de los que trae `biblioteca` en el contexto, por su `id`. Sale como mensaje de la IA, con la ventana de 24 h abierta y solo por WhatsApp; en el Laboratorio se guarda en el hilo y no se envía. El mismo archivo sale máximo 2 veces en 24 h (la segunda, si el cliente lo pide) y no más de 6 archivos por conversación en 24 h; `/api/bot/reset` reinicia esa cuenta.",
         "requestBody": { "required": true, "content": { "application/json": { "schema": { "type": "object", "required": ["conversationId", "archivoId"], "properties": { "conversationId": { "type": "string" }, "archivoId": { "type": "string", "examples": ["bib_x3k9..."] } } } } } },
         "responses": {
           "200": { "description": "Enviado", "content": { "application/json": { "schema": { "type": "object", "required": ["messageId", "titulo", "status"], "properties": { "messageId": { "type": "string" }, "titulo": { "type": "string" }, "status": { "const": "sent" } } } } } },

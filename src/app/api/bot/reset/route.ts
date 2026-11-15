@@ -5,6 +5,9 @@ import { apiError, parseBody } from "@/lib/api";
 import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { publish } from "@/server/events/bus";
 import { moveLeadToStage } from "@/server/leads/stage-history";
+import { bibliotecaEnabled } from "@/server/biblioteca/flag";
+import { olvidarEnvios } from "@/server/biblioteca/store";
+import { borrarTodoDeLaConversacion, resetTotalEnabled } from "@/server/reset-total";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,17 @@ export async function POST(req: Request) {
     .limit(1);
   const conv = rows[0];
   if (!conv) return apiError(404, "not_found", "Conversación no encontrada");
+
+  // Módulo de la agencia: con RESET_TOTAL la prueba empieza de cero (ficha,
+  // mensajes, cotizaciones, termómetro…), antes de regresar la etapa.
+  if (resetTotalEnabled()) {
+    const { fallos } = await borrarTodoDeLaConversacion({
+      organizationId,
+      conversationId: conv.id,
+      contactId: conv.contactId,
+    });
+    if (fallos.length > 0) console.warn(`[bot/reset] reset total incompleto: ${fallos.join(", ")}`);
+  }
 
   await db
     .update(schema.conversation)
@@ -89,9 +103,17 @@ export async function POST(req: Request) {
     console.warn(`[bot/reset] reinicio de etapa falló: ${err}`);
   }
 
+  // Módulo de la agencia (Biblioteca): la conversación reiniciada empieza sin
+  // archivos «ya enviados» (best-effort, como la etapa).
+  if (bibliotecaEnabled() && !resetTotalEnabled()) {
+    await olvidarEnvios(organizationId, conv.id).catch((err) =>
+      console.warn(`[bot/reset] olvidar envíos de la biblioteca falló: ${err}`)
+    );
+  }
+
   publish(organizationId, {
     type: "conversation.updated",
-    data: { conversation: { id: conv.id } },
+    data: { conversation: { id: conv.id }, ...(resetTotalEnabled() ? { reiniciada: true } : {}) },
   });
   return Response.json({ ok: true });
 }

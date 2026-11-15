@@ -75,7 +75,7 @@ export async function enviarDelAgente(input: {
   const hoy = await enviadosDesde(organizationId, conversationId, new Date(Date.now() - DIA_MS));
   const bloqueo = bloqueoDeEnvio({
     archivoActivo: fila.activo,
-    yaEnviadoHoy: hoy.includes(archivoId),
+    vecesEsteArchivo: hoy.filter((id) => id === archivoId).length,
     enviosHoy: hoy.length,
   });
   if (bloqueo) return { ok: false, status: 409, ...bloqueo };

@@ -234,6 +234,18 @@ export async function enviadosDesde(
   return filas.map((f) => f.archivoId);
 }
 
+/**
+ * El `/reset` de la línea de pruebas: la conversación vuelve a empezar, así
+ * que el agente no debe creer que ya mandó nada (decía «ahí te la mandé» sin
+ * mandarla). Los mensajes del hilo se quedan: solo se borra la cuenta.
+ */
+export async function olvidarEnvios(organizationId: string, conversationId: string): Promise<void> {
+  await asegurarTablas();
+  await getDb()
+    .delete(envio)
+    .where(and(scoped(envio.organizationId, organizationId), eq(envio.conversationId, conversationId)));
+}
+
 /** Qué archivos se le han mandado alguna vez a esta conversación. */
 export async function enviadosAConversacion(organizationId: string, conversationId: string): Promise<Set<string>> {
   return new Set(await enviadosDesde(organizationId, conversationId, new Date(0)));

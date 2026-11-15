@@ -274,8 +274,15 @@ export function InboxClient({
         )
       );
     },
-    onConversationUpdated: () => {
+    onConversationUpdated: ({ conversation, reiniciada }) => {
       void refetchJunta();
+      // Módulo de la agencia: el `/reset` total borró el hilo; si está abierto,
+      // se vacía en vivo (mensajes y notas) sin recargar la página.
+      const id = (conversation as { id?: string } | null)?.id;
+      if (reiniciada && id && selectedIdRef.current === id) {
+        void refetchMessages(id);
+        void refetchNotas(id);
+      }
       // 054 — Cambió la etapa o la IA: el hilo pinta el evento en vivo.
       if (selectedIdRef.current) void refetchEventos(selectedIdRef.current);
       // El agente movió de etapa o cambió el handoff: refresca el panel en vivo.

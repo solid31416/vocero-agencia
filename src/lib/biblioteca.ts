@@ -33,6 +33,12 @@ export const MAX_CUANDO = 300;
 export const MAX_ARCHIVOS = 60;
 /** Cuántos archivos puede mandar el agente en una conversación en 24 horas. */
 export const MAX_ENVIOS_POR_DIA = 6;
+/**
+ * Veces que un MISMO archivo puede salir a una conversación en 24 h: la
+ * primera y un reenvío cuando el cliente lo pide («no me llegó», «mándamela
+ * otra vez»). Con 1, el agente le contestaba «el sistema no me deja».
+ */
+export const MAX_VECES_POR_ARCHIVO = 2;
 
 export type ArchivoDto = {
   id: string;
@@ -134,14 +140,18 @@ export function paraElAgente(
 /** Por qué el agente no puede mandar este archivo ahora; null si puede. */
 export function bloqueoDeEnvio(input: {
   archivoActivo: boolean;
-  yaEnviadoHoy: boolean;
+  /** Cuántas veces salió ESTE archivo a esta conversación en las últimas 24 h. */
+  vecesEsteArchivo: number;
   enviosHoy: number;
 }): { codigo: "archivo_apagado" | "ya_enviado" | "limite"; detalle: string } | null {
   if (!input.archivoActivo) {
     return { codigo: "archivo_apagado", detalle: "Ese archivo está apagado en la biblioteca" };
   }
-  if (input.yaEnviadoHoy) {
-    return { codigo: "ya_enviado", detalle: "Ese archivo ya se le mandó a este cliente hoy; no lo repitas" };
+  if (input.vecesEsteArchivo >= MAX_VECES_POR_ARCHIVO) {
+    return {
+      codigo: "ya_enviado",
+      detalle: `Ese archivo ya se le mandó ${input.vecesEsteArchivo} veces hoy; dile que está arriba en el chat y ofrécele pasarlo con una persona si no lo ve`,
+    };
   }
   if (input.enviosHoy >= MAX_ENVIOS_POR_DIA) {
     return {

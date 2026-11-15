@@ -19,7 +19,8 @@ export type EventHandlers = {
     messageId: string;
     media: unknown;
   }) => void;
-  onConversationUpdated?: (data: { conversation: unknown }) => void;
+  /** `reiniciada`: el `/reset` total la dejó en blanco (módulo de la agencia). */
+  onConversationUpdated?: (data: { conversation: unknown; reiniciada?: boolean }) => void;
   /** 026 */
   onConversationDeleted?: (data: {
     conversationId: string;

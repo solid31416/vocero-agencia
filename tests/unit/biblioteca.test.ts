@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MAX_ENVIOS_POR_DIA,
+  MAX_VECES_POR_ARCHIVO,
   bloqueoDeEnvio,
   detectarMime,
   paraElAgente,
@@ -56,12 +57,16 @@ describe("biblioteca: lo que ve y puede hacer el agente", () => {
     expect(lista.find((a) => a.id === "bib_1")?.yaEnviado).toBe(false);
   });
 
-  it("no repite un archivo el mismo día ni pasa del tope", () => {
-    expect(bloqueoDeEnvio({ archivoActivo: true, yaEnviadoHoy: false, enviosHoy: 0 })).toBeNull();
-    expect(bloqueoDeEnvio({ archivoActivo: false, yaEnviadoHoy: false, enviosHoy: 0 })?.codigo).toBe("archivo_apagado");
-    expect(bloqueoDeEnvio({ archivoActivo: true, yaEnviadoHoy: true, enviosHoy: 1 })?.codigo).toBe("ya_enviado");
+  it("deja reenviar un archivo una vez si lo piden, sin pasar del tope", () => {
+    expect(bloqueoDeEnvio({ archivoActivo: true, vecesEsteArchivo: 0, enviosHoy: 0 })).toBeNull();
+    expect(bloqueoDeEnvio({ archivoActivo: false, vecesEsteArchivo: 0, enviosHoy: 0 })?.codigo).toBe("archivo_apagado");
+    // «Reenvíame la foto»: la segunda vez sí sale.
+    expect(bloqueoDeEnvio({ archivoActivo: true, vecesEsteArchivo: 1, enviosHoy: 1 })).toBeNull();
     expect(
-      bloqueoDeEnvio({ archivoActivo: true, yaEnviadoHoy: false, enviosHoy: MAX_ENVIOS_POR_DIA })?.codigo
+      bloqueoDeEnvio({ archivoActivo: true, vecesEsteArchivo: MAX_VECES_POR_ARCHIVO, enviosHoy: 2 })?.codigo
+    ).toBe("ya_enviado");
+    expect(
+      bloqueoDeEnvio({ archivoActivo: true, vecesEsteArchivo: 0, enviosHoy: MAX_ENVIOS_POR_DIA })?.codigo
     ).toBe("limite");
   });
 
