@@ -544,6 +544,8 @@ export async function sendMediaMessage(input: {
   replyToMessageId?: string;
   /** 044: grabado en el compositor; sale como nota de voz si es Ogg/Opus. */
   voz?: boolean;
+  /** Módulo de la agencia (Biblioteca): lo manda el agente, no una persona. */
+  aiGenerated?: boolean;
 }): Promise<SendResult> {
   // 044: un WebM grabado se pasa a Ogg antes de validar (WhatsApp no acepta WebM).
   const audio = input.file.mimeType.startsWith("audio/")
@@ -553,7 +555,7 @@ export async function sendMediaMessage(input: {
   // Validación previa (FR-007): tipo y tamaño antes de tocar disco o red.
   const kind = validateOutgoing(file.mimeType, file.data.byteLength);
 
-  const target = await prepareSend(input.conversationId, input.organizationId);
+  const target = await prepareSend(input.conversationId, input.organizationId, input.aiGenerated ?? false);
   const { credentials } = target;
   const sendCaps = capabilitiesFor(target.conversation.channel);
   if (!sendCaps.outboundMedia) {
@@ -621,7 +623,8 @@ export async function sendMediaMessage(input: {
       type: kind,
       text: null,
       status: "pending",
-      origin: "operator",
+      aiGenerated: input.aiGenerated ?? false,
+      origin: input.aiGenerated ? "ai" : "operator",
       mediaAssetId: assetId,
       media: asset,
       cita,
@@ -653,7 +656,8 @@ export async function sendMediaMessage(input: {
       text: null,
       status: "failed",
       error: sendErr.message,
-      origin: "operator",
+      aiGenerated: input.aiGenerated ?? false,
+      origin: input.aiGenerated ? "ai" : "operator",
       mediaAssetId: assetId,
       media: asset,
       cita,

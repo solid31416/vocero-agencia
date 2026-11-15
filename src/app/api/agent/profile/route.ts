@@ -10,6 +10,7 @@ import {
   type ClaveHerramienta,
 } from "@/lib/agent-roles";
 import { agendaEnabled } from "@/server/agenda/flag";
+import { bibliotecaEnabled } from "@/server/biblioteca/flag";
 import { leerConfigDespacho, urlSaludCerebro } from "@/server/brains/config";
 import { getBrainHealth } from "@/server/bot/status";
 
@@ -39,6 +40,8 @@ export const GET = withAuth(async (session) => {
     },
     // 034 — Sin la bandera, la pantalla no ofrece agendar ni reprogramar.
     agendaEnabled: agendaEnabled(),
+    // Módulo de la agencia: sin la bandera, no se ofrece «Mandar fotos y videos».
+    bibliotecaEnabled: bibliotecaEnabled(),
     aiConfigured: estado.activa,
     // Por qué no (sin configurar, llave rechazada, sin saldo): la pantalla
     // Agente lo dice con el enlace a Ajustes → IA.

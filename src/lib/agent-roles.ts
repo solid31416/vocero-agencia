@@ -17,7 +17,8 @@ export type ClaveHerramienta =
   | "agendar"
   | "reprogramar"
   | "salida"
-  | "escalar";
+  | "escalar"
+  | "biblioteca";
 
 export type Herramienta = {
   clave: ClaveHerramienta;
@@ -25,6 +26,8 @@ export type Herramienta = {
   descripcion: string;
   /** Solo existe con la bandera `AGENDA` encendida. */
   agenda?: true;
+  /** Módulo de la agencia: solo existe con la bandera `BIBLIOTECA` encendida. */
+  biblioteca?: true;
   /** Red de seguridad: no se apaga (spec 034, D2). */
   fija?: true;
 };
@@ -68,6 +71,14 @@ export const HERRAMIENTAS: readonly Herramienta[] = [
     descripcion:
       "Cuando el cliente lo pide, ante hostilidad o lo que no sabe. Siempre encendida.",
     fija: true,
+  },
+  {
+    // Módulo de la agencia (Treviño AI): Ajustes → Biblioteca.
+    clave: "biblioteca",
+    etiqueta: "Mandar fotos y videos",
+    descripcion:
+      "Manda fotos, videos o fichas de la Biblioteca cuando el cliente quiere ver algo.",
+    biblioteca: true,
   },
 ];
 

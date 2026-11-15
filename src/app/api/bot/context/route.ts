@@ -9,6 +9,7 @@ import { windowMsFor } from "@/server/channels/capabilities";
 import { citasParaContexto } from "@/server/agenda/context";
 import { anuncioDelContacto } from "@/server/attribution/store";
 import { siguientesDelLead } from "@/server/bot/stage";
+import { archivosParaElAgente } from "@/server/biblioteca/agente";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +124,9 @@ export async function GET(req: Request) {
   const nextStages = leadRows[0]
     ? await siguientesDelLead(organizationId, leadRows[0].lead.stageId)
     : [];
+  // Módulo de la agencia: con BIBLIOTECA y la herramienta encendida, qué
+  // fotos, videos y fichas puede mandar el agente. Si falla, no va.
+  const biblioteca = await archivosParaElAgente(organizationId, conversation.id).catch(() => null);
 
   return Response.json({
     contact: {
@@ -173,5 +177,11 @@ export async function GET(req: Request) {
      * y uno que no lo lee no cambia. Aditivo.
      */
     ...(booking ? { booking } : {}),
+    /**
+     * Módulo de la agencia — la Biblioteca: los archivos que el agente puede
+     * mandar con `POST /api/bot/biblioteca`. FALTA sin la bandera, con la
+     * herramienta apagada o sin archivos activos. Aditivo.
+     */
+    ...(biblioteca && biblioteca.length > 0 ? { biblioteca } : {}),
   });
 }

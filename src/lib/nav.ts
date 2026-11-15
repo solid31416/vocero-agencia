@@ -114,7 +114,10 @@ export function settingsSections({
   seguimiento = false,
   pedidos = false,
   cuenta = false,
+  biblioteca = false,
 }: {
+  /** Módulo de la agencia: Ajustes → Biblioteca con la bandera BIBLIOTECA. */
+  biblioteca?: boolean;
   /** Módulo de la agencia: «Tu cuenta → Contraseña» (el layout de Ajustes la enciende siempre). */
   cuenta?: boolean;
   /** Módulo de la agencia: Ajustes → Pedidos con la bandera PEDIDOS. */
@@ -148,6 +151,7 @@ export function settingsSections({
   const agente: SettingsLink[] = [{ href: "/settings/ai", label: "IA" }];
   if (agenda) agente.push({ href: "/settings/calendar", label: "Agenda" });
   if (seguimiento) agente.push({ href: "/settings/seguimiento", label: "Seguimiento" });
+  if (biblioteca) agente.push({ href: "/settings/biblioteca", label: "Biblioteca" });
 
   const negocio: SettingsLink[] = [
     { href: "/settings/branding", label: "Marca" },
