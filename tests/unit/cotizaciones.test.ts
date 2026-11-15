@@ -2,6 +2,7 @@ import { PDFDocument } from "pdf-lib";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   CONFIG_POR_DEFECTO,
+  PROMPT_SUGERENCIA,
   armarMensaje,
   calcularTotales,
   configSchema,
@@ -62,6 +63,18 @@ describe("cotizaciones — totales", () => {
     expect(t.iva).toBe(31200.24);
     expect(t.total).toBe(226201.74);
     expect(t.anticipo).toBe(74646.57);
+  });
+});
+
+describe("cotizaciones — las notas son para el cliente", () => {
+  it("la IA las escribe para el cliente y sin nada interno", () => {
+    expect(PROMPT_SUGERENCIA).toMatch(/PARA EL CLIENTE/);
+    expect(PROMPT_SUGERENCIA).toMatch(/NUNCA pongas nada interno/);
+    for (const interno of ["resumen de la conversación", "ánimo", "llamadas, fotos", "etapas"]) {
+      expect(PROMPT_SUGERENCIA).toContain(interno);
+    }
+    expect(PROMPT_SUGERENCIA).toMatch(/deja notas vacío/);
+    expect(PROMPT_SUGERENCIA).not.toMatch(/en una o dos frases"\}/);
   });
 });
 

@@ -184,6 +184,32 @@ export type CotizacionDto = {
 };
 
 /** Lo que la IA propone a partir de la plática: solo productos y cantidades. */
+/**
+ * Lo que se le pide a la IA en «Que la IA la llene». Las notas salen
+ * IMPRESAS en el PDF que recibe el cliente: son aclaraciones para él sobre lo
+ * que cubre la cotización, nunca un resumen de la plática para el vendedor
+ * (con «resume los detalles» la IA metía «pidió fotos», «quiere llamada»,
+ * su ánimo…). Las condiciones fijas (pago, vigencia) viven en Ajustes.
+ */
+export const PROMPT_SUGERENCIA = [
+  "Armas el BORRADOR de una cotización a partir de una conversación de WhatsApp entre un negocio y su cliente.",
+  "Devuelve SOLO JSON con esta forma:",
+  '{"partidas":[{"productoId":"id de la lista o null","concepto":"nombre del producto o servicio","cantidad":1}],"notas":"aclaraciones para el cliente, o vacío"}',
+  "Reglas de las partidas:",
+  "- Usa productos de la LISTA siempre que se pueda (copia su id exacto).",
+  "- Si el cliente pidió algo que no está en la lista, ponlo con productoId null y un concepto claro.",
+  "- La cantidad sale de lo que dijo el cliente; si no la dijo, 1.",
+  "- NUNCA incluyas precios, descuentos ni totales.",
+  "- Si no hay nada que cotizar, devuelve partidas vacío.",
+  "Reglas de las notas (van IMPRESAS en la cotización que recibe el CLIENTE):",
+  "- Escríbelas PARA EL CLIENTE, en tono profesional, de 1 a 3 frases.",
+  "- Solo aclara lo que cubre o supone esta cotización: lugar de entrega o instalación, modelo o medidas elegidas, fecha deseada, y lo que corre por cuenta del cliente que haya salido en la plática (por ejemplo nivelar el terreno o dar acceso).",
+  "- NUNCA pongas nada interno: ni resumen de la conversación, ni su ánimo o urgencia, ni lo que le pidió al vendedor (llamadas, fotos, visitas), ni etapas, temperatura, cotizaciones anteriores o su nombre de pila.",
+  "- No inventes condiciones ni plazos que no salieron en la plática. Si no hay nada que aclarar, deja notas vacío.",
+  'Ejemplo de notas correctas: "Incluye entrega e instalación en Dr. Arroyo, N.L. No incluye la preparación del terreno, que corre por cuenta del cliente."',
+  'Ejemplo de notas INCORRECTAS (son para el vendedor): "El cliente pidió fotos y que le llamen; tiene prisa."',
+].join("\n");
+
 export const sugerenciaIaSchema = z.object({
   partidas: z
     .array(

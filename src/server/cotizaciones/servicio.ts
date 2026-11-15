@@ -5,6 +5,7 @@ import {
   fechaLarga,
   folioDe,
   formatoDinero,
+  PROMPT_SUGERENCIA,
   partidasDeSugerencia,
   sugerenciaIaSchema,
   type Partida,
@@ -145,17 +146,7 @@ export async function sugerirPartidas(
           .join("\n")
       : "(el negocio no tiene lista de productos)";
 
-  const system = [
-    "Armas el BORRADOR de una cotización a partir de una conversación de WhatsApp entre un negocio y su cliente.",
-    "Devuelve SOLO JSON con esta forma:",
-    '{"partidas":[{"productoId":"id de la lista o null","concepto":"nombre del producto o servicio","cantidad":1}],"notas":"detalles del pedido que el cliente pidió (ubicación, fechas, colores), en una o dos frases"}',
-    "Reglas:",
-    "- Usa productos de la LISTA siempre que se pueda (copia su id exacto).",
-    "- Si el cliente pidió algo que no está en la lista, ponlo con productoId null y un concepto claro.",
-    "- La cantidad sale de lo que dijo el cliente; si no la dijo, 1.",
-    "- NUNCA incluyas precios, descuentos ni totales.",
-    "- Si no hay nada que cotizar, devuelve partidas vacío.",
-  ].join("\n");
+  const system = PROMPT_SUGERENCIA;
   const user = `LISTA DE PRODUCTOS:\n${lista}\n\nCONVERSACIÓN (de la más vieja a la más nueva):\n${platica}`;
 
   const r = await chatJson(
