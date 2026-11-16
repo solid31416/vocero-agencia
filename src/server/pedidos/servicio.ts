@@ -1,15 +1,28 @@
+import { and, asc, eq } from "drizzle-orm";
+import { customAlphabet } from "nanoid";
+import { getDb, schema } from "@/lib/db";
+import { scoped } from "@/lib/db/tenant";
+import { formatoDinero } from "@/lib/cotizaciones";
 import {
+  MAX_PAGOS,
   armarMensaje,
+  etapaDeAnticipo,
   folioDe,
+  mensajeDePago,
+  resumenPagos,
   resumenParaFicha,
+  tipoDePago,
   variablesPlantilla,
   type AvisoHistorial,
   type Cambio,
   type ConfigPedidos,
   type Etapa,
   type Movimiento,
+  type Pago,
+  type PagoInput,
   type PedidoInput,
 } from "@/lib/pedidos";
+import { moveLeadToStage } from "@/server/leads/stage-history";
 import { upsertFicha } from "@/server/bot/ficha";
 import { sendText, SendError } from "@/server/inbox/send";
 import { sendTemplate } from "@/server/whatsapp/templates";
@@ -66,6 +79,9 @@ async function avisar(
 async function anotarEnFicha(organizationId: string, config: ConfigPedidos, f: FilaPedido): Promise<void> {
   if (!config.actualizarFicha || !f.contactId) return;
   const ultima = config.etapas[config.etapas.length - 1]?.id === f.etapaId;
+  const monto = f.monto === null ? null : Number(f.monto);
+  const pagos = Array.isArray(f.pagos) ? f.pagos : [];
+  const r = resumenPagos(monto, pagos);
   await upsertFicha({
     organizationId,
     contactId: f.contactId,
@@ -76,6 +92,14 @@ async function anotarEnFicha(organizationId: string, config: ConfigPedidos, f: F
         etapaNombre: f.etapaNombre,
         fechaEstimada: f.fechaEstimada,
         esUltima: ultima,
+        pagos:
+          pagos.length > 0
+            ? {
+                pagado: formatoDinero(r.pagado),
+                saldo: r.saldo !== null && r.saldo > 0 ? formatoDinero(r.saldo) : null,
+                liquidado: r.liquidado,
+              }
+            : null,
       }),
     },
   }).catch((err) => console.warn("[pedidos] no se pudo anotar en la ficha:", err));
@@ -143,6 +167,7 @@ export async function cambiarPedido(
   if (cambio.concepto !== undefined) datos.concepto = cambio.concepto;
   if (cambio.monto !== undefined) datos.monto = cambio.monto;
   if (cambio.fechaEstimada !== undefined) datos.fechaEstimada = cambio.fechaEstimada;
+  if (cambio.cobrarSaldoEl !== undefined) datos.cobrarSaldoEl = cambio.cobrarSaldoEl;
   let f = { ...previo, ...datos };
 
   if (cambio.etapaId) {
@@ -185,4 +210,127 @@ export async function borrarPedido(organizationId: string, id: string): Promise<
     );
   }
   return true;
+}
+
+/* ------------------------------------------------------------------
+ * Anticipo y saldo
+ * ------------------------------------------------------------------ */
+
+const nanoPago = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 16);
+
+/**
+ * El primer pago (el anticipo) pasa al lead a la etapa «Anticipo…» del
+ * embudo, si el negocio tiene una y el lead todavía no llega ahí. Nunca
+ * truena: el pago ya quedó guardado.
+ */
+async function moverAAnticipo(organizationId: string, contactId: string, userId: string | null): Promise<string | null> {
+  try {
+    const db = getDb();
+    const etapas = await db
+      .select({ id: schema.pipelineStage.id, name: schema.pipelineStage.name, kind: schema.pipelineStage.kind, position: schema.pipelineStage.position })
+      .from(schema.pipelineStage)
+      .where(scoped(schema.pipelineStage.organizationId, organizationId))
+      .orderBy(asc(schema.pipelineStage.position));
+    const destino = etapaDeAnticipo(etapas);
+    if (!destino) return null;
+    const [lead] = await db
+      .select({ id: schema.lead.id, stageId: schema.lead.stageId })
+      .from(schema.lead)
+      .where(and(eq(schema.lead.organizationId, organizationId), eq(schema.lead.contactId, contactId)))
+      .limit(1);
+    if (!lead) return null;
+    const actual = etapas.find((e) => e.id === lead.stageId);
+    // Si ya va en esa etapa o más adelante (o en ganado/perdido), no se mueve.
+    if (actual && (actual.kind !== "open" || actual.position >= destino.position)) return null;
+    const r = await moveLeadToStage({
+      organizationId,
+      leadId: lead.id,
+      toStageId: destino.id,
+      actorUserId: userId,
+      source: userId ? "dueno" : "sistema",
+    });
+    return r.ok && r.changed ? destino.name : null;
+  } catch (err) {
+    console.warn("[pedidos] no se pudo mover el lead a la etapa de anticipo:", err);
+    return null;
+  }
+}
+
+export type ResultadoPago = {
+  pedido: FilaPedido;
+  /** Si el lead pasó de etapa en el embudo, a cuál. */
+  etapaEmbudo: string | null;
+  aviso: { aviso: AvisoHistorial; detalle: string | null } | null;
+};
+
+/** Registra un pago (anticipo, abono o liquidación) y, si se pide, le avisa al cliente. */
+export async function registrarPago(
+  organizationId: string,
+  id: string,
+  datos: PagoInput,
+  userId: string | null,
+  hoy: string
+): Promise<Resultado<ResultadoPago>> {
+  const previo = await leerPedido(organizationId, id);
+  if (!previo) return { ok: false, status: 404, codigo: "not_found", detalle: "Pedido no encontrado" };
+  const previos = Array.isArray(previo.pagos) ? previo.pagos : [];
+  if (previos.length >= MAX_PAGOS) {
+    return { ok: false, status: 409, codigo: "lleno", detalle: `Máximo ${MAX_PAGOS} pagos por pedido` };
+  }
+  const monto = previo.monto === null ? null : Number(previo.monto);
+  const pago: Pago = {
+    id: `pag_${nanoPago()}`,
+    monto: Math.round(datos.monto * 100) / 100,
+    fecha: datos.fecha ?? hoy,
+    nota: datos.nota,
+    tipo: tipoDePago(monto, previos, datos.monto),
+    por: userId,
+    creadoEn: new Date().toISOString(),
+  };
+  const pagos = [...previos, pago];
+  const final = await actualizarPedido(organizationId, id, { pagos });
+  if (!final) return { ok: false, status: 404, codigo: "not_found", detalle: "Pedido no encontrado" };
+  const config = await leerConfig(organizationId);
+  await anotarEnFicha(organizationId, config, final);
+
+  const etapaEmbudo = previos.length === 0 && final.contactId ? await moverAAnticipo(organizationId, final.contactId, userId) : null;
+
+  let aviso: ResultadoPago["aviso"] = null;
+  if (datos.avisar) {
+    const contacto = final.conversationId ? await contactoDeConversacion(organizationId, final.conversationId) : null;
+    if (contacto?.isTest) {
+      aviso = { aviso: "no", detalle: "Conversación de prueba" };
+    } else {
+      const r = resumenPagos(monto, pagos);
+      const texto =
+        datos.mensaje ??
+        mensajeDePago({
+          contacto: final.contactoNombre,
+          folio: folioDe(final.numero),
+          monto: formatoDinero(pago.monto),
+          saldo: r.saldo !== null && r.saldo > 0 ? formatoDinero(r.saldo) : null,
+          liquidado: r.liquidado,
+        });
+      aviso = await avisar(organizationId, config, final, texto);
+    }
+  }
+  return { ok: true, valor: { pedido: final, etapaEmbudo, aviso } };
+}
+
+/** Quita un pago capturado por error. */
+export async function quitarPago(organizationId: string, id: string, pagoId: string): Promise<Resultado<FilaPedido>> {
+  const previo = await leerPedido(organizationId, id);
+  if (!previo) return { ok: false, status: 404, codigo: "not_found", detalle: "Pedido no encontrado" };
+  const previos = Array.isArray(previo.pagos) ? previo.pagos : [];
+  if (!previos.some((p) => p.id === pagoId)) {
+    return { ok: false, status: 404, codigo: "not_found", detalle: "Ese pago ya no está" };
+  }
+  // Los tipos se recalculan: si se quita el anticipo, el siguiente pasa a serlo.
+  const monto = previo.monto === null ? null : Number(previo.monto);
+  const quedan: Pago[] = [];
+  for (const p of previos.filter((x) => x.id !== pagoId)) quedan.push({ ...p, tipo: tipoDePago(monto, quedan, p.monto) });
+  const final = await actualizarPedido(organizationId, id, { pagos: quedan });
+  if (!final) return { ok: false, status: 404, codigo: "not_found", detalle: "Pedido no encontrado" };
+  await anotarEnFicha(organizationId, await leerConfig(organizationId), final);
+  return { ok: true, valor: final };
 }

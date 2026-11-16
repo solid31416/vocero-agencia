@@ -8,8 +8,11 @@ import {
   configSchema,
   folioDe,
   indiceDeEtapa,
+  resumenPagos,
+  tocaCobrar,
   type ConfigPedidos,
   type Movimiento,
+  type Pago,
   type PedidoDto,
 } from "@/lib/pedidos";
 
@@ -45,6 +48,9 @@ export const pedido = pgTable("agencia_pedido", {
   historial: jsonb("historial").$type<Movimiento[]>().notNull(),
   cotizacionId: text("cotizacion_id"),
   notas: text("notas").notNull().default(""),
+  /** Anticipo y saldo: los pagos recibidos, en orden. */
+  pagos: jsonb("pagos").$type<Pago[]>().notNull().default([]),
+  cobrarSaldoEl: date("cobrar_saldo_el", { mode: "string" }),
   borrado: boolean("borrado").notNull().default(false),
   creadoPor: text("creado_por"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -98,6 +104,16 @@ async function crear(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS agencia_pedido_org_idx ON agencia_pedido (organization_id, updated_at)`
   );
+  // Anticipo y saldo (2026-11-16): columnas nuevas, aditivas.
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS pagos jsonb NOT NULL DEFAULT '[]'::jsonb`);
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS cobrar_saldo_el date`);
+}
+
+/** Hoy en AAAA-MM-DD, en la zona de México (el negocio). */
+export function hoyIso(zona = "America/Mexico_City"): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: zona, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+    new Date()
+  );
 }
 
 export async function leerConfig(organizationId: string): Promise<ConfigPedidos> {
@@ -122,7 +138,16 @@ export async function guardarConfig(organizationId: string, c: ConfigPedidos): P
 }
 
 export function aDto(f: FilaPedido, config: ConfigPedidos): PedidoDto {
+  const monto = f.monto === null ? null : Number(f.monto);
+  const pagos = Array.isArray(f.pagos) ? f.pagos : [];
+  const r = resumenPagos(monto, pagos);
   return {
+    pagos,
+    pagado: r.pagado,
+    saldo: r.saldo,
+    liquidado: r.liquidado,
+    cobrarSaldoEl: f.cobrarSaldoEl ?? null,
+    tocaCobrar: tocaCobrar(r.saldo, f.cobrarSaldoEl ?? null, hoyIso()),
     id: f.id,
     folio: folioDe(f.numero),
     conversationId: f.conversationId,

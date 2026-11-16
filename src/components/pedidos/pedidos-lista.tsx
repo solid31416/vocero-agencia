@@ -6,6 +6,7 @@ import { Package, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { fechaLegible, type Etapa, type PedidoDto } from "@/lib/pedidos";
+import { formatoDinero } from "@/lib/cotizaciones";
 import { AvancePedido, PedidoTarjeta } from "@/components/pedidos/pedido-tarjeta";
 
 /**
@@ -110,6 +111,14 @@ export function PedidosLista({ puedeBorrar = false }: { puedeBorrar?: boolean })
                       </span>
                       <span className="text-xs text-muted-foreground sm:self-center sm:text-right">
                         {p.fechaEstimada ? fechaLegible(p.fechaEstimada) : "Sin fecha"}
+                        {p.liquidado ? (
+                          <span className="block font-medium text-success-text">Liquidado</span>
+                        ) : p.saldo !== null && p.saldo > 0 && (p.pagos?.length ?? 0) > 0 ? (
+                          <span className={cn("block font-medium", p.tocaCobrar ? "text-warning-text" : "text-text-2")}>
+                            {p.tocaCobrar ? "Toca cobrar: " : "Falta "}
+                            {formatoDinero(p.saldo)}
+                          </span>
+                        ) : null}
                       </span>
                     </button>
                   </li>

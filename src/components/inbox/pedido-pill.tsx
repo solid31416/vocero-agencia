@@ -42,6 +42,8 @@ export function PedidoPill({ conversation, puedeBorrar }: { conversation: Conver
   }, [cargar]);
 
   const ultimo = datos?.pedidos[0] ?? null;
+  // Anticipo y saldo: algún pedido de este cliente ya tiene que cobrarse.
+  const porCobrar = datos?.pedidos.find((p) => p.tocaCobrar) ?? null;
 
   return (
     <>
@@ -53,13 +55,17 @@ export function PedidoPill({ conversation, puedeBorrar }: { conversation: Conver
         className={cn(
           "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-5 transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          ultimo
+          porCobrar
+            ? "border-warning-soft bg-warning-tint text-warning-text"
+            : ultimo
             ? "border-brand-text/40 bg-brand-tint text-brand-text"
             : "border-border-strong text-text-2 hover:border-text-3 hover:text-foreground"
         )}
       >
         <Package className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
-        <span className="max-w-[9rem] truncate max-sm:sr-only">{ultimo ? ultimo.etapaNombre : "Pedido"}</span>
+        <span className="max-w-[9rem] truncate max-sm:sr-only">
+          {porCobrar ? "Cobrar saldo" : ultimo ? ultimo.etapaNombre : "Pedido"}
+        </span>
       </button>
       {abierto && (
         <div

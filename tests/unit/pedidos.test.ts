@@ -3,6 +3,12 @@ import {
   CONFIG_POR_DEFECTO,
   ETAPAS_POR_DEFECTO,
   armarMensaje,
+  etapaDeAnticipo,
+  mensajeDePago,
+  pagoInputSchema,
+  resumenPagos,
+  tipoDePago,
+  tocaCobrar,
   cambioSchema,
   claveDeEtapa,
   configSchema,
@@ -142,5 +148,66 @@ describe("pedidos — menú y bandera", () => {
     expect(pedidosEnabled()).toBe(false);
     process.env.PEDIDOS = "on";
     expect(pedidosEnabled()).toBe(true);
+  });
+});
+
+describe("anticipo y saldo", () => {
+  it("cuánto se pagó y cuánto falta", () => {
+    expect(resumenPagos(145000, [])).toEqual({ pagado: 0, saldo: 145000, liquidado: false });
+    expect(resumenPagos(145000, [{ monto: 72500 }])).toEqual({ pagado: 72500, saldo: 72500, liquidado: false });
+    expect(resumenPagos(145000, [{ monto: 72500 }, { monto: 72500 }])).toEqual({ pagado: 145000, saldo: 0, liquidado: true });
+    expect(resumenPagos(100, [{ monto: 150 }])).toMatchObject({ saldo: 0, liquidado: true });
+    expect(resumenPagos(null, [{ monto: 10 }])).toEqual({ pagado: 10, saldo: null, liquidado: false });
+  });
+
+  it("el primero es el anticipo y el que deja en cero, la liquidación", () => {
+    expect(tipoDePago(145000, [], 72500)).toBe("anticipo");
+    expect(tipoDePago(145000, [{ monto: 72500 }], 30000)).toBe("abono");
+    expect(tipoDePago(145000, [{ monto: 72500 }, { monto: 30000 }], 42500)).toBe("liquidacion");
+    expect(tipoDePago(145000, [], 145000)).toBe("liquidacion");
+    expect(tipoDePago(null, [], 500)).toBe("anticipo");
+  });
+
+  it("toca cobrar solo con saldo y la fecha ya llegó", () => {
+    expect(tocaCobrar(1000, "2026-11-16", "2026-11-16")).toBe(true);
+    expect(tocaCobrar(1000, "2026-11-20", "2026-11-16")).toBe(false);
+    expect(tocaCobrar(0, "2026-11-01", "2026-11-16")).toBe(false);
+    expect(tocaCobrar(1000, null, "2026-11-16")).toBe(false);
+  });
+
+  it("la etapa del embudo para el anticipo", () => {
+    const etapas = [
+      { name: "Negociación", kind: "open" },
+      { name: "Anticipo pagado", kind: "open" },
+      { name: "Ganado", kind: "won" },
+    ];
+    expect(etapaDeAnticipo(etapas)?.name).toBe("Anticipo pagado");
+    expect(etapaDeAnticipo([{ name: "Nuevo", kind: "open" }])).toBeNull();
+  });
+
+  it("el aviso al cliente", () => {
+    const base = { contacto: "Saúl Garza", folio: "PED-0001", monto: "$72,500.00" };
+    expect(mensajeDePago({ ...base, saldo: "$72,500.00", liquidado: false })).toBe(
+      "Hola Saúl, recibimos tu pago de $72,500.00 para tu pedido PED-0001. ¡Gracias! Queda un saldo de $72,500.00."
+    );
+    expect(mensajeDePago({ ...base, saldo: null, liquidado: true })).toContain("quedó liquidado");
+  });
+
+  it("un pago necesita monto mayor a cero", () => {
+    expect(pagoInputSchema.safeParse({ monto: 0 }).success).toBe(false);
+    expect(pagoInputSchema.parse({ monto: 100 })).toMatchObject({ fecha: null, nota: "", avisar: false });
+  });
+
+  it("la ficha dice cuánto lleva pagado", () => {
+    expect(
+      resumenParaFicha({
+        folio: "PED-0001",
+        concepto: "Domo Mini",
+        etapaNombre: "En fabricación",
+        fechaEstimada: null,
+        esUltima: false,
+        pagos: { pagado: "$72,500.00", saldo: "$72,500.00", liquidado: false },
+      })
+    ).toBe("PED-0001 · Domo Mini · estado: En fabricación · pagado: $72,500.00, falta: $72,500.00");
   });
 });

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { formatoDinero } from "@/lib/cotizaciones";
+import { PagosPedido } from "@/components/pedidos/pagos-pedido";
 import {
   MAX_MENSAJE,
   armarMensaje,
@@ -150,6 +151,8 @@ export function PedidoTarjeta({
         </span>
       </div>
       <AvancePedido pedido={pedido} etapas={etapas} />
+
+      <PagosPedido pedido={pedido} puedeBorrar={puedeBorrar} onCambio={(p) => onCambio(p)} />
 
       <div className="space-y-2 rounded-md bg-subtle p-2.5">
         <div className="grid gap-2 sm:grid-cols-2">
