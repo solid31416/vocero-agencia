@@ -9,6 +9,8 @@ import { ResultsClient } from "@/components/results/results-client";
 import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { contadorEnabled } from "@/server/contador-mensajes/flag";
+// Módulo de la agencia — Resultados por modelo (COTIZACIONES).
+import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ export default async function ResultsPage() {
       agenda={agendaEnabled()}
       today={todayInTz(new Date(), timezone)}
       timezone={timezone}
+      porModelo={cotizacionesEnabled()}
       accionExtra={
         contadorEnabled() ? (
           <Link

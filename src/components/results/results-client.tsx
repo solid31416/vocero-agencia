@@ -10,6 +10,8 @@ import type {
 import { AdsSection } from "./ads-section";
 import { BotSection } from "./bot-section";
 import { HygieneSection } from "./hygiene-section";
+import type { PorModeloDto } from "@/lib/por-modelo";
+import { ModelosSection } from "./modelos-section";
 import { defaultRange, RangePicker, type Range } from "./range-picker";
 import { SalesSection } from "./sales-section";
 
@@ -66,6 +68,7 @@ export function ResultsClient({
   today,
   timezone,
   accionExtra = null,
+  porModelo = false,
 }: {
   currency: string;
   agenda: boolean;
@@ -74,12 +77,15 @@ export function ResultsClient({
   timezone: string;
   /** Módulo de la agencia: botón extra en la cabecera (enlace al contador de mensajes). */
   accionExtra?: React.ReactNode;
+  /** Módulo de la agencia: «Por modelo» (con COTIZACIONES). */
+  porModelo?: boolean;
 }) {
   const [range, setRange] = useState<Range>(() => defaultRange(today));
   const [sales, setSales] = useState<Block<SalesBlockDto>>(inicial);
   const [ads, setAds] = useState<Block<AdsBlockDto>>(inicial);
   const [bot, setBot] = useState<Block<BotBlockDto>>(inicial);
   const [hygiene, setHygiene] = useState<Block<HygieneBlockDto>>(inicial);
+  const [modelos, setModelos] = useState<Block<PorModeloDto>>(inicial);
 
   useEffect(() => {
     const ctl = new AbortController();
@@ -87,8 +93,9 @@ export function ResultsClient({
     void cargar(`/api/analytics/sales?${q}`, setSales, ctl.signal);
     void cargar(`/api/analytics/ads?${q}`, setAds, ctl.signal);
     void cargar(`/api/analytics/bot?${q}`, setBot, ctl.signal);
+    if (porModelo) void cargar(`/api/analytics/modelos?${q}`, setModelos, ctl.signal);
     return () => ctl.abort();
-  }, [range]);
+  }, [range, porModelo]);
 
   // La higiene describe el AHORA: no depende del rango elegido.
   useEffect(() => {
@@ -115,6 +122,7 @@ export function ResultsClient({
 
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-3 sm:p-6">
         <SalesSection {...sales} currency={currency} />
+        {porModelo && <ModelosSection {...modelos} />}
         <AdsSection {...ads} />
         <BotSection {...bot} agenda={agenda} />
         <HygieneSection {...hygiene} currency={currency} />
