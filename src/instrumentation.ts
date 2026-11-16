@@ -41,5 +41,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: recordarle el saldo al cliente el día de cobro (PEDIDOS).
     const { iniciarRecordarSaldo } = await import("./server/pedidos/recordar-saldo");
     iniciarRecordarSaldo();
+    // Módulo de la agencia: reporte semanal al dueño por WhatsApp (COTIZACIONES).
+    const { iniciarReporteSemanal } = await import("./server/reporte-semanal/reporte");
+    iniciarReporteSemanal();
   }
 }

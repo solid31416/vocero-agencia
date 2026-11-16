@@ -79,7 +79,9 @@ export async function avisarAlDueno(
   config: Pick<ConfigContador, "telefonoDueno" | "plantillaId">,
   texto: string,
   /** El resumen para quien atiende lo usa sin el ⚠️ del contador. */
-  prefijo = "⚠️ "
+  prefijo = "⚠️ ",
+  /** Los valores de la plantilla según cuántas variables tenga (por defecto, el texto entero en la primera). */
+  variablesPlantilla?: (cuantas: number) => string[]
 ): Promise<string> {
   if (!config.telefonoDueno) return "Solo en el CRM: no hay teléfono del dueño para avisarle por WhatsApp";
   const db = getDb();
@@ -133,7 +135,8 @@ export async function avisarAlDueno(
       .from(schema.template)
       .where(scoped(schema.template.organizationId, organizationId, eq(schema.template.id, config.plantillaId)))
       .limit(1);
-    const variables = t && countVariables(t.body) > 0 ? [texto] : [];
+    const cuantas = t ? countVariables(t.body) : 0;
+    const variables = variablesPlantilla ? variablesPlantilla(cuantas) : cuantas > 0 ? [texto] : [];
     await sendTemplate({ organizationId, conversationId: conv.id, templateId: config.plantillaId, variables });
     return "Enviado al dueño con plantilla (ventana cerrada)";
   } catch (err) {

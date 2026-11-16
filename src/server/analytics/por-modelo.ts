@@ -26,7 +26,10 @@ import type { ResolvedPeriod } from "./period";
 /** Tope de mensajes leídos por periodo: de sobra para un negocio de pocos productos. */
 const MAX_MENSAJES = 20_000;
 
-export async function porModeloBlock(organizationId: string, period: ResolvedPeriod): Promise<PorModeloDto> {
+export async function porModeloBlock(
+  organizationId: string,
+  period: Pick<ResolvedPeriod, "start" | "end">
+): Promise<PorModeloDto> {
   await tablasCotizaciones();
   const config = await leerConfig(organizationId);
   const productos = config.productos;

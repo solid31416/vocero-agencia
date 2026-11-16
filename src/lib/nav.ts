@@ -164,6 +164,8 @@ export function settingsSections({
   ];
   if (atribucion) negocio.push({ href: "/settings/ads", label: "Anuncios" });
   if (cotizaciones) negocio.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
+  // Módulo de la agencia: el reporte semanal al dueño va con COTIZACIONES.
+  if (cotizaciones) negocio.push({ href: "/settings/reporte", label: "Reporte semanal" });
   if (pedidos) negocio.push({ href: "/settings/pedidos", label: "Pedidos" });
 
   const secciones: SettingsSection[] = [
