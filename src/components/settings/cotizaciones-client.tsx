@@ -280,7 +280,7 @@ export function CotizacionesClient() {
                       cambiar({
                         productos: [
                           ...config.productos,
-                          { id: nuevoId(), nombre: "", precio: 0, unidad: "pieza", descripcion: "" },
+                          { id: nuevoId(), nombre: "", precio: 0, unidad: "pieza", descripcion: "", extra: false },
                         ],
                       })
                     }
@@ -315,6 +315,19 @@ export function CotizacionesClient() {
                       <Input aria-label="Descripción" placeholder="Descripción corta (sale en el PDF, opcional)"
                         value={p.descripcion} disabled={!editable} className="sm:col-span-4"
                         onChange={(e) => cambiarProducto(p.id, { descripcion: e.target.value })} />
+                      <label className="flex items-start gap-2 text-xs text-muted-foreground sm:col-span-4">
+                        <input
+                          type="checkbox"
+                          className="mt-0.5 h-4 w-4 shrink-0 accent-[hsl(var(--primary))]"
+                          checked={p.extra}
+                          disabled={!editable}
+                          onChange={(e) => cambiarProducto(p.id, { extra: e.target.checked })}
+                        />
+                        <span>
+                          <span className="font-medium text-foreground">Es un extra o servicio</span> (flete,
+                          instalación…): sale en la cotización, pero no cuenta como modelo en Resultados.
+                        </span>
+                      </label>
                     </li>
                   ))}
                 </ul>

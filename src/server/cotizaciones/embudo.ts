@@ -1,6 +1,9 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
+import { scoped } from "@/lib/db/tenant";
+import { etapaDeCotizacion } from "@/lib/cotizaciones";
 import { publish } from "@/server/events/bus";
+import { moveLeadToStage } from "@/server/leads/stage-history";
 
 /**
  * Módulo de la agencia — que el embudo se entere de la cotización: el trato
@@ -38,5 +41,60 @@ export async function montoAlTrato(input: {
     }
   } catch (err) {
     console.warn("[cotizaciones] no se pudo poner el monto al trato:", err);
+  }
+}
+
+/**
+ * Al salir la cotización, el trato pasa a la etapa de «Cotización enviada»
+ * (si el negocio tiene una). Solo hacia adelante y desde una etapa abierta:
+ * si ya iba más adelante, ganado o perdido, se queda donde está. Esa etapa
+ * la pone el CRM, no la IA (ver `src/server/bot/stage.ts`). Nunca truena.
+ */
+export async function moverACotizacion(input: {
+  organizationId: string;
+  contactId: string | null;
+  conversationId: string | null;
+  actorUserId: string | null;
+}): Promise<string | null> {
+  if (!input.contactId) return null;
+  try {
+    const db = getDb();
+    const etapas = await db
+      .select({
+        id: schema.pipelineStage.id,
+        name: schema.pipelineStage.name,
+        kind: schema.pipelineStage.kind,
+        position: schema.pipelineStage.position,
+      })
+      .from(schema.pipelineStage)
+      .where(scoped(schema.pipelineStage.organizationId, input.organizationId))
+      .orderBy(asc(schema.pipelineStage.position));
+    const destino = etapaDeCotizacion(etapas);
+    if (!destino) return null;
+    const [lead] = await db
+      .select({ id: schema.lead.id, stageId: schema.lead.stageId })
+      .from(schema.lead)
+      .where(scoped(schema.lead.organizationId, input.organizationId, eq(schema.lead.contactId, input.contactId)))
+      .limit(1);
+    if (!lead) return null;
+    const actual = etapas.find((e) => e.id === lead.stageId);
+    if (actual && (actual.kind !== "open" || actual.position >= destino.position)) return null;
+    const r = await moveLeadToStage({
+      organizationId: input.organizationId,
+      leadId: lead.id,
+      toStageId: destino.id,
+      actorUserId: input.actorUserId,
+      source: input.actorUserId ? "dueno" : "sistema",
+    });
+    if (r.ok && r.changed && input.conversationId) {
+      publish(input.organizationId, {
+        type: "conversation.updated",
+        data: { conversation: { id: input.conversationId } },
+      });
+    }
+    return r.ok && r.changed ? destino.name : null;
+  } catch (err) {
+    console.warn("[cotizaciones] no se pudo mover el trato a la etapa de cotización:", err);
+    return null;
   }
 }

@@ -33,6 +33,12 @@ export const productoSchema = z.object({
   precio: dinero,
   unidad: z.string().trim().max(20).default("pieza"),
   descripcion: z.string().trim().max(300).default(""),
+  /**
+   * Módulo de la agencia: un extra o servicio (flete, instalación, base). Sale
+   * en la cotización como cualquiera, pero no es un modelo: no cuenta en
+   * Resultados por modelo ni en el reporte, ni se ofrece en la Biblioteca.
+   */
+  extra: z.boolean().default(false),
 });
 export type Producto = z.infer<typeof productoSchema>;
 
@@ -316,6 +322,21 @@ export function siguienteToque(e: EntradaToque): { toque: Toque; fecha: Date } |
 }
 
 /** El producto principal de la cotización (la partida de más valor) para el recordatorio. */
+/**
+ * Módulo de la agencia: ¿esta etapa del Pipeline es la de «cotización
+ * enviada»? La pone el CRM cuando el PDF sale; una que diga que el cliente
+ * PIDIÓ cotización («Pidió cotización», «Solicita cotización») no cuenta.
+ */
+export function esEtapaDeCotizacion(nombre: string): boolean {
+  const n = normalizar(nombre);
+  return n.includes("cotiz") && !/\b(pide|pidio|piden|solicit|quiere|interes)/.test(n);
+}
+
+/** La etapa abierta de «cotización enviada» del Pipeline, si el negocio tiene una. */
+export function etapaDeCotizacion<T extends { name: string; kind: string }>(etapas: readonly T[]): T | null {
+  return etapas.find((e) => e.kind === "open" && esEtapaDeCotizacion(e.name)) ?? null;
+}
+
 export function productoPrincipal(partidas: readonly Pick<Partida, "concepto" | "cantidad" | "precio">[]): string {
   const conNombre = partidas.filter((p) => p.concepto.trim());
   if (conNombre.length === 0) return "tu proyecto";

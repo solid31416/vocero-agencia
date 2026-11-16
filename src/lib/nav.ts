@@ -156,8 +156,15 @@ export function settingsSections({
   // #85 — el proveedor de IA se configura aquí; el entorno queda de respaldo.
   const agente: SettingsLink[] = [{ href: "/settings/ai", label: "IA" }];
   if (agenda) agente.push({ href: "/settings/calendar", label: "Agenda" });
-  if (seguimiento) agente.push({ href: "/settings/seguimiento", label: "Seguimiento" });
-  if (biblioteca) agente.push({ href: "/settings/biblioteca", label: "Biblioteca" });
+
+  // Módulo de la agencia: todo lo de vender, junto, en «Ventas».
+  const ventas: SettingsLink[] = [];
+  if (cotizaciones) ventas.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
+  if (pedidos) ventas.push({ href: "/settings/pedidos", label: "Pedidos" });
+  if (seguimiento) ventas.push({ href: "/settings/seguimiento", label: "Seguimiento" });
+  if (biblioteca) ventas.push({ href: "/settings/biblioteca", label: "Biblioteca" });
+  // El reporte semanal al dueño va con COTIZACIONES.
+  if (cotizaciones) ventas.push({ href: "/settings/reporte", label: "Reporte semanal" });
 
   const negocio: SettingsLink[] = [
     { href: "/settings/branding", label: "Marca" },
@@ -169,20 +176,31 @@ export function settingsSections({
     { href: "/settings/team", label: "Equipo" },
   ];
   if (atribucion) negocio.push({ href: "/settings/ads", label: "Anuncios" });
-  if (cotizaciones) negocio.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
-  // Módulo de la agencia: el reporte semanal al dueño va con COTIZACIONES.
-  if (cotizaciones) negocio.push({ href: "/settings/reporte", label: "Reporte semanal" });
-  if (pedidos) negocio.push({ href: "/settings/pedidos", label: "Pedidos" });
 
-  const secciones: SettingsSection[] = [
-    { title: "Canales", links: canales },
-    { title: "Agente", links: agente },
-    { title: "Negocio", links: negocio },
-  ];
+  // Con módulos de venta, lo de todos los días va primero y los canales (que
+  // se tocan una vez, al instalar) al final.
+  const secciones: SettingsSection[] =
+    ventas.length > 0
+      ? [
+          { title: "Ventas", links: ventas },
+          { title: "Agente", links: agente },
+          { title: "Negocio", links: negocio },
+          { title: "Canales", links: canales },
+        ]
+      : [
+          { title: "Canales", links: canales },
+          { title: "Agente", links: agente },
+          { title: "Negocio", links: negocio },
+        ];
   if (cuenta) {
     secciones.push({ title: "Tu cuenta", links: [{ href: "/settings/cuenta", label: "Contraseña" }] });
   }
   return secciones;
+}
+
+/** Módulo de la agencia: a dónde lleva «Ajustes» (la primera pantalla de la primera sección). */
+export function settingsInicio(secciones: readonly SettingsSection[]): string {
+  return secciones[0]?.links[0]?.href ?? "/settings/whatsapp";
 }
 
 /** Activa si la ruta es la entrada o cuelga de ella (`/inbox/cv_123`). */

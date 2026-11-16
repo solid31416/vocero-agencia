@@ -23,7 +23,7 @@ async function nombresDeProductos(organizationId: string): Promise<string[]> {
   if (!cotizacionesEnabled()) return [];
   try {
     const config = await leerConfig(organizationId);
-    return [...new Set(config.productos.map((p) => p.nombre.trim()).filter(Boolean))];
+    return [...new Set(config.productos.filter((p) => !p.extra).map((p) => p.nombre.trim()).filter(Boolean))];
   } catch {
     return [];
   }

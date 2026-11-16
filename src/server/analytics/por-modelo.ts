@@ -32,8 +32,9 @@ export async function porModeloBlock(
 ): Promise<PorModeloDto> {
   await tablasCotizaciones();
   const config = await leerConfig(organizationId);
-  const productos = config.productos;
-  if (productos.length === 0) return { filas: [], moneda: config.moneda, sinLista: true };
+  if (config.productos.length === 0) return { filas: [], moneda: config.moneda, sinLista: true };
+  // Los extras (flete, instalación) no son modelos.
+  const productos = config.productos.filter((p) => !p.extra);
   const claves = clavesDeProductos(productos);
   const db = getDb();
 

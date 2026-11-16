@@ -20,9 +20,9 @@ import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { acentoParaPapel, generarPdfCotizacion, limpiarTexto, nombreArchivo } from "@/server/cotizaciones/pdf";
 
 const productos: Producto[] = [
-  { id: "p1", nombre: "Domo Estándar", precio: 100000, unidad: "pieza", descripcion: "Expansión en dos direcciones" },
-  { id: "p2", nombre: "Domo Mini", precio: 65000.5, unidad: "pieza", descripcion: "" },
-  { id: "p3", nombre: "Instalación", precio: 15000, unidad: "servicio", descripcion: "" },
+  { id: "p1", nombre: "Domo Estándar", precio: 100000, unidad: "pieza", descripcion: "Expansión en dos direcciones", extra: false },
+  { id: "p2", nombre: "Domo Mini", precio: 65000.5, unidad: "pieza", descripcion: "", extra: false },
+  { id: "p3", nombre: "Instalación", precio: 15000, unidad: "servicio", descripcion: "", extra: true },
 ];
 
 describe("cotizaciones — totales", () => {

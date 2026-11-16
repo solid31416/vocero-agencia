@@ -17,7 +17,7 @@ import { getBranding } from "@/server/branding";
 import { SendError, sendMediaMessage } from "@/server/inbox/send";
 import { generarPdfCotizacion, nombreArchivo } from "./pdf";
 import { leerConfig, leerCotizacion, leerLogo, marcarEnviada } from "./store";
-import { montoAlTrato } from "./embudo";
+import { montoAlTrato, moverACotizacion } from "./embudo";
 
 type Fila = NonNullable<Awaited<ReturnType<typeof leerCotizacion>>>;
 
@@ -106,6 +106,13 @@ export async function enviarCotizacion(organizationId: string, id: string): Prom
       total: fila.totales.total,
       moneda: fila.condiciones.moneda ?? "MXN",
       soloSiVacio: true,
+    });
+    // Y pasa a «Cotización enviada» (la IA no puede ponerla: ver bot/stage.ts).
+    await moverACotizacion({
+      organizationId,
+      contactId: fila.contactId,
+      conversationId: fila.conversationId,
+      actorUserId: null,
     });
     return { ok: true, messageId: r.messageId };
   } catch (err) {

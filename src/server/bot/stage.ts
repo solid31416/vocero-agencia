@@ -3,6 +3,17 @@ import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { herramientasEfectivas } from "@/lib/agent-roles";
 import { moveLeadToStage } from "@/server/leads/stage-history";
+import { esEtapaDeCotizacion } from "@/lib/cotizaciones";
+import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
+
+/**
+ * Módulo de la agencia: con cotizaciones encendidas, la etapa «Cotización
+ * enviada» la pone el CRM cuando el PDF sale al cliente. Si la IA la pusiera
+ * al dar un precio, el embudo diría que salió una cotización que no existe.
+ */
+function reservadaAlCrm(nombre: string): boolean {
+  return cotizacionesEnabled() && esEtapaDeCotizacion(nombre);
+}
 
 /**
  * 038 — El cerebro mueve la etapa del lead (`POST /api/bot/stage`).
@@ -153,7 +164,7 @@ export async function moverEtapaPorElCerebro(input: {
     return { ok: false, status: 404, code: "sin_lead", message: "El contacto no tiene lead en el pipeline" };
   }
 
-  const siguientes = etapasSiguientes(stages, lead.stageId);
+  const siguientes = etapasSiguientes(stages, lead.stageId).filter((s) => !reservadaAlCrm(s.name));
   const destino = resolverEtapa(input.stage, stages);
   if (!destino) {
     return {
@@ -161,6 +172,15 @@ export async function moverEtapaPorElCerebro(input: {
       status: 422,
       code: "etapa_desconocida",
       message: `No existe la etapa «${input.stage.trim()}». ${listaParaElModelo(siguientes)}`,
+    };
+  }
+
+  if (destino.id !== lead.stageId && reservadaAlCrm(destino.name)) {
+    return {
+      ok: false,
+      status: 409,
+      code: "etapa_no_permitida",
+      message: `La etapa «${destino.name}» la pone el CRM solo cuando la cotización en PDF sale al cliente. ${listaParaElModelo(siguientes)}`,
     };
   }
 
@@ -210,5 +230,7 @@ export async function siguientesDelLead(
     })
     .from(schema.pipelineStage)
     .where(scoped(schema.pipelineStage.organizationId, organizationId));
-  return etapasSiguientes(stages, currentStageId).map(({ id, name }) => ({ id, name }));
+  return etapasSiguientes(stages, currentStageId)
+    .filter((s) => !reservadaAlCrm(s.name))
+    .map(({ id, name }) => ({ id, name }));
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   etapasSiguientes,
   moverEtapaPorElCerebro,
@@ -153,5 +153,56 @@ describe("moverEtapaPorElCerebro", () => {
     expect(await mover("Calificado")).toMatchObject({ status: 404, code: "not_found" });
     base({ leadStage: null });
     expect(await mover("Calificado")).toMatchObject({ status: 404, code: "sin_lead" });
+  });
+});
+
+describe("módulo de la agencia: «Cotización enviada» la pone el CRM", () => {
+  const CON_COT: EtapaDelPipeline[] = [
+    { id: "st_nuevo", name: "Nuevo", position: 0, kind: "open" },
+    { id: "st_calif", name: "Calificado", position: 1, kind: "open" },
+    { id: "st_cot", name: "Cotización enviada", position: 2, kind: "open" },
+    { id: "st_visita", name: "Visita o demo", position: 3, kind: "open" },
+  ];
+  const previo = process.env.COTIZACIONES;
+  const mover = (stage: string) =>
+    moverEtapaPorElCerebro({ organizationId: "org_1", conversationId: "cv_1", stage });
+  const base = () =>
+    dbState.queue.push(
+      [{ id: "cv_1", contactId: "ct_1", aiEnabled: true, handoffAt: null }],
+      [{ tools: null }],
+      [{ id: "ld_1", stageId: "st_calif" }],
+      CON_COT
+    );
+
+  beforeEach(() => {
+    dbState.queue = [];
+    movimientos.llamadas = [];
+    movimientos.changed = true;
+  });
+  afterEach(() => {
+    if (previo === undefined) delete process.env.COTIZACIONES;
+    else process.env.COTIZACIONES = previo;
+  });
+
+  it("con COTIZACIONES: la IA no puede ponerla y el mensaje no se la ofrece", async () => {
+    process.env.COTIZACIONES = "on";
+    base();
+    const res = await mover("Cotización enviada");
+    expect(res).toMatchObject({ ok: false, status: 409, code: "etapa_no_permitida" });
+    expect(!res.ok && res.message).toContain("la pone el CRM");
+    expect(!res.ok && res.message).toContain("Puedes moverlo a: Visita o demo.");
+    expect(movimientos.llamadas).toEqual([]);
+  });
+
+  it("con COTIZACIONES: las demás siguen igual", async () => {
+    process.env.COTIZACIONES = "on";
+    base();
+    expect((await mover("Visita o demo")).ok).toBe(true);
+  });
+
+  it("sin COTIZACIONES: como siempre, la IA sí puede", async () => {
+    delete process.env.COTIZACIONES;
+    base();
+    expect((await mover("Cotización enviada")).ok).toBe(true);
   });
 });
