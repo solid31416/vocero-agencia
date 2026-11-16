@@ -233,6 +233,9 @@ function Subir({
   const [elegidos, setElegidos] = useState<Elegido[]>([]);
   const [titulo, setTitulo] = useState("");
   const [cuando, setCuando] = useState("");
+  // El «cuándo» que se llenó solo al elegir un producto: si nadie lo tocó,
+  // cambia con el producto; si lo escribieron a mano, se respeta.
+  const [cuandoAuto, setCuandoAuto] = useState<string | null>(null);
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
@@ -286,7 +289,11 @@ function Subir({
 
   function elegirProducto(p: string) {
     setTitulo(p.slice(0, MAX_TITULO));
-    if (!cuando.trim()) setCuando(cuandoDelProducto(p));
+    if (!cuando.trim() || cuando === cuandoAuto) {
+      const sugerido = cuandoDelProducto(p);
+      setCuando(sugerido);
+      setCuandoAuto(sugerido);
+    }
   }
 
   const pesoTotal = elegidos.reduce((t, e) => t + e.file.size, 0);
@@ -312,6 +319,7 @@ function Subir({
     setElegidos([]);
     setTitulo("");
     setCuando("");
+    setCuandoAuto(null);
     limpiarInput();
     setListo(true);
     onSubido();
@@ -370,15 +378,32 @@ function Subir({
                   ({elegidos.length} de {maxPartes})
                 </span>
               </Label>
-              <Input
+              <input
                 ref={input}
                 id="bib-archivo"
                 type="file"
                 multiple
                 accept={ACEPTA}
+                className="sr-only"
                 disabled={elegidos.length >= maxPartes}
                 onChange={(e) => void agregar(e.target.files)}
               />
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={elegidos.length >= maxPartes}
+                  onClick={() => input.current?.click()}
+                >
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  {elegidos.length === 0 ? "Elegir fotos o videos" : "Agregar más"}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {elegidos.length === 0
+                    ? "Ningún archivo elegido"
+                    : `${elegidos.length} ${elegidos.length === 1 ? "elegido" : "elegidos"}`}
+                </span>
+              </div>
               <p className="text-xs text-muted-foreground">
                 Puedes elegir varias a la vez (mantén Ctrl o toca varias en el celular) o agregarlas de una en una.
               </p>
