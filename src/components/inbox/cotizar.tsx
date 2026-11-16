@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FileText, Plus, Sparkles, Trash2 } from "lucide-react";
+import { Copy, FileText, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConversationDto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -108,6 +108,9 @@ function VentanaCotizar({
   // la plática solo si nadie lo ha tocado.
   const [cliente, setCliente] = useState(conversation.contact.name);
   const [borradorId, setBorradorId] = useState<string | null>(null);
+  // Si el cliente ya tiene cotizaciones (y no hay borrador), primero se ven
+  // ellas con sus datos; el formulario en blanco es solo para hacer otra.
+  const [armando, setArmando] = useState(true);
   const [ocupado, setOcupado] = useState<null | "ia" | "vista" | "enviar">(null);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
 
@@ -121,6 +124,7 @@ function VentanaCotizar({
       setDatos(d);
       // Si quedó un borrador de esta conversación, se retoma.
       const borrador = d.cotizaciones.find((c) => c.estado === "borrador");
+      setArmando(Boolean(borrador) || !d.cotizaciones.some((c) => c.estado !== "borrador"));
       if (borrador) {
         setBorradorId(borrador.id);
         setPartidas(borrador.partidas);
@@ -250,6 +254,27 @@ function VentanaCotizar({
 
   const anteriores = (datos?.cotizaciones ?? []).filter((c) => c.estado !== "borrador");
 
+  /** Arma una nueva a partir de una que ya se mandó (mismas partidas, notas y nombre). */
+  function copiar(c: CotizacionDto) {
+    setPartidas(c.partidas.map((p) => ({ ...p })));
+    setDescuentoPct(c.descuentoPct);
+    setNotas(c.notas);
+    setCliente(c.contactoNombre);
+    setBorradorId(null);
+    setAviso(null);
+    setArmando(true);
+  }
+
+  function nueva() {
+    setPartidas([partidaVacia()]);
+    setDescuentoPct(0);
+    setNotas("");
+    setCliente(conversation.contact.name);
+    setBorradorId(null);
+    setAviso(null);
+    setArmando(true);
+  }
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-overlay p-4"
@@ -266,20 +291,57 @@ function VentanaCotizar({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 id="cotizar-titulo" className="text-[16px] font-bold">
-              Cotización para {cliente.trim() || conversation.contact.name}
+              {armando
+                ? `${borradorId ? "Cotización" : "Nueva cotización"} para ${cliente.trim() || conversation.contact.name}`
+                : `Cotizaciones de ${conversation.contact.name}`}
             </h3>
             <p className="mt-1 text-sm text-text-3">
-              Los precios salen de tu lista (Ajustes → Cotizaciones). Puedes cambiarlos aquí.
+              {armando
+                ? "Los precios salen de tu lista (Ajustes → Cotizaciones). Puedes cambiarlos aquí."
+                : "Lo que ya le mandaste. Márcala aceptada cuando te diga que sí, o haz otra."}
             </p>
           </div>
-          <Button type="button" variant="outline" size="sm" onClick={() => void llenarConIa()} disabled={!datos || ocupado !== null}>
-            <Sparkles className="mr-1 h-4 w-4" aria-hidden />
-            {ocupado === "ia" ? "Leyendo la plática…" : "Que la IA la llene"}
-          </Button>
+          {armando && (
+            <Button type="button" variant="outline" size="sm" onClick={() => void llenarConIa()} disabled={!datos || ocupado !== null}>
+              <Sparkles className="mr-1 h-4 w-4" aria-hidden />
+              {ocupado === "ia" ? "Leyendo la plática…" : "Que la IA la llene"}
+            </Button>
+          )}
         </div>
 
         {!datos ? (
           <p className="text-sm text-muted-foreground">Cargando…</p>
+        ) : !armando ? (
+          <>
+            <ul className="space-y-3">
+              {anteriores.map((c) => (
+                <TarjetaCotizacion
+                  key={c.id}
+                  cotizacion={c}
+                  pedidosActivos={Boolean(datos.pedidosActivos)}
+                  pedidoFolio={datos.pedidoDeCotizacion?.[c.id] ?? null}
+                  onCopiar={() => copiar(c)}
+                  onListo={(texto, ok) => {
+                    setAviso({ ok, texto });
+                    void recargarLista();
+                  }}
+                />
+              ))}
+            </ul>
+            {aviso && (
+              <p role="status" className={cn("text-sm", aviso.ok ? "text-success-text" : "text-danger-text")}>
+                {aviso.texto}
+              </p>
+            )}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="ghost" onClick={onCancel}>
+                Cerrar
+              </Button>
+              <Button type="button" onClick={nueva}>
+                <Plus className="mr-1 h-4 w-4" aria-hidden /> Nueva cotización
+              </Button>
+            </div>
+          </>
         ) : (
           <>
             {datos.productos.length === 0 && (
@@ -447,6 +509,11 @@ function VentanaCotizar({
             )}
 
             <div className="flex flex-wrap justify-end gap-2">
+              {anteriores.length > 0 && (
+                <Button type="button" variant="ghost" className="mr-auto" onClick={() => setArmando(false)}>
+                  ← Ver las que ya mandé
+                </Button>
+              )}
               <Button type="button" variant="ghost" onClick={onCancel}>
                 Cerrar
               </Button>
@@ -504,5 +571,81 @@ function VentanaCotizar({
         )}
       </div>
     </div>
+  );
+}
+
+/** Una cotización ya mandada, con lo que dice: partidas, total, notas y qué sigue. */
+function TarjetaCotizacion({
+  cotizacion: c,
+  pedidosActivos,
+  pedidoFolio,
+  onCopiar,
+  onListo,
+}: {
+  cotizacion: CotizacionDto;
+  pedidosActivos: boolean;
+  pedidoFolio: string | null;
+  onCopiar: () => void;
+  onListo: (texto: string, ok: boolean) => void;
+}) {
+  const fecha = new Date(c.enviadaEn ?? c.createdAt).toLocaleDateString("es-MX", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+  return (
+    <li className="space-y-2 rounded-md border p-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <EstadoChip estado={c.estado} />
+        <span className="font-mono font-semibold">{c.folio}</span>
+        <span className="text-xs text-text-3">{fecha}</span>
+        <span className="ml-auto font-bold">{formatoDinero(c.totales.total, c.moneda)}</span>
+      </div>
+      <p className="text-xs text-text-3">A nombre de {c.contactoNombre}</p>
+      <ul className="space-y-0.5">
+        {c.partidas.map((p, i) => (
+          <li key={i} className="flex justify-between gap-3">
+            <span>
+              {p.cantidad} × {p.concepto}
+            </span>
+            <span className="shrink-0 text-text-3">{formatoDinero(p.cantidad * p.precio, c.moneda)}</span>
+          </li>
+        ))}
+      </ul>
+      {(c.descuentoPct > 0 || c.totales.anticipo > 0) && (
+        <p className="text-xs text-text-3">
+          {c.descuentoPct > 0 && `Descuento ${c.descuentoPct}%. `}
+          {c.totales.anticipo > 0 && c.totales.anticipo < c.totales.total
+            ? `Anticipo ${formatoDinero(c.totales.anticipo, c.moneda)}.`
+            : ""}
+        </p>
+      )}
+      {c.notas && <p className="text-xs text-text-2">Notas: {c.notas}</p>}
+      <div className="flex flex-wrap items-center gap-2 border-t pt-2">
+        <a
+          href={`/api/cotizaciones/${c.id}/pdf`}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-xs font-medium text-brand-text hover:underline"
+        >
+          <FileText className="h-3.5 w-3.5" aria-hidden /> Ver PDF
+        </a>
+        <button
+          type="button"
+          onClick={onCopiar}
+          className="inline-flex items-center gap-1 text-xs font-medium text-text-2 hover:text-foreground"
+        >
+          <Copy className="h-3.5 w-3.5" aria-hidden /> Hacer otra a partir de esta
+        </button>
+        <span className="ml-auto">
+          <AceptarCotizacion
+            cotizacion={c}
+            pedidosActivos={pedidosActivos}
+            pedidoFolio={pedidoFolio}
+            onListo={onListo}
+          />
+        </span>
+      </div>
+    </li>
   );
 }
