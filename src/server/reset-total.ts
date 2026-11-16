@@ -3,6 +3,7 @@ import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
 import { vaciarFicha } from "@/server/bot/ficha";
 import { parsePausaPorHumanoFlag } from "@/server/inbox/pausa-por-humano-flag";
+import { olvidarNombreReal } from "@/server/nombre-real";
 
 /**
  * Módulo de la agencia — `/reset` que borra TODO (bandera `RESET_TOTAL`).
@@ -113,6 +114,8 @@ export async function borrarTodoDeLaConversacion(input: {
   );
   // La ficha por su puerta única (`vaciarFicha`); las notas del contacto aparte.
   await paso("ficha", () => vaciarFicha(db, organizationId, contactId));
+  // El nombre que dio el cliente se olvida: vuelve el de su perfil de WhatsApp.
+  await paso("nombre real", () => olvidarNombreReal(organizationId, contactId));
   await paso("notas del contacto", () =>
     db
       .update(schema.contact)

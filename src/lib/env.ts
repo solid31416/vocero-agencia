@@ -76,6 +76,9 @@ export const envSchema = z.object({
   // Módulo de la agencia: /reset de pruebas que borra TODO (ficha, mensajes,
   // cotizaciones, termómetro…). Apagado por defecto. Ej.: RESET_TOTAL=on
   RESET_TOTAL: z.string().optional(),
+  // Módulo de la agencia: el nombre que da el cliente (o su empresa) pasa a ser
+  // el nombre del contacto en lugar del de su perfil de WhatsApp. Ej.: NOMBRE_REAL=on
+  NOMBRE_REAL: z.string().optional(),
   // Módulo de la agencia: el agente aprende de sus traspasos. Cuando una persona
   // atiende una conversación que el agente pasó, la IA propone preguntas y
   // respuestas para el conocimiento; el dueño las aprueba en la pantalla Agente.

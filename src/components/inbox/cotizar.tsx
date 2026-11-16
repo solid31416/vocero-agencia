@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Copy, FileText, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConversationDto } from "@/lib/types";
@@ -48,6 +48,8 @@ type Datos = {
   pedidosActivos?: boolean;
   /** Cotización → folio del pedido que ya nació de ella. */
   pedidoDeCotizacion?: Record<string, string>;
+  /** El nombre (y la empresa) que dio el cliente en la plática, si lo dio. */
+  aNombreDe?: string | null;
 };
 
 const partidaVacia = (): Partida => ({
@@ -107,6 +109,7 @@ function VentanaCotizar({
   // salvo que alguien lo haya renombrado); la IA lo cambia por el que dio en
   // la plática solo si nadie lo ha tocado.
   const [cliente, setCliente] = useState(conversation.contact.name);
+  const nombreInicial = useRef(conversation.contact.name);
   const [borradorId, setBorradorId] = useState<string | null>(null);
   // Si el cliente ya tiene cotizaciones (y no hay borrador), primero se ven
   // ellas con sus datos; el formulario en blanco es solo para hacer otra.
@@ -125,6 +128,8 @@ function VentanaCotizar({
       // Si quedó un borrador de esta conversación, se retoma.
       const borrador = d.cotizaciones.find((c) => c.estado === "borrador");
       setArmando(Boolean(borrador) || !d.cotizaciones.some((c) => c.estado !== "borrador"));
+      // Sin borrador, la cotización arranca a nombre de lo que dijo el cliente.
+      if (!borrador && d.aNombreDe) setCliente((c) => (c === nombreInicial.current ? d.aNombreDe! : c));
       if (borrador) {
         setBorradorId(borrador.id);
         setPartidas(borrador.partidas);
@@ -269,7 +274,7 @@ function VentanaCotizar({
     setPartidas([partidaVacia()]);
     setDescuentoPct(0);
     setNotas("");
-    setCliente(conversation.contact.name);
+    setCliente(datos?.aNombreDe || conversation.contact.name);
     setBorradorId(null);
     setAviso(null);
     setArmando(true);
@@ -438,7 +443,7 @@ function VentanaCotizar({
               />
               {cliente.trim() === conversation.contact.name && (
                 <p className="text-[11px] text-text-3">
-                  Es el nombre de su perfil de WhatsApp. Cámbialo por el que te dio, o deja que la IA lo llene.
+                  Sale del nombre que dio el cliente (o del de su WhatsApp si todavía no lo da). Cámbialo si hace falta, o deja que la IA lo llene.
                 </p>
               )}
             </div>

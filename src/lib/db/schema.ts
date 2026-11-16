@@ -149,14 +149,16 @@ export const contact = pgTable(
      * Quién puso este nombre.
      *
      * `perfil` = lo trajo WhatsApp y puede seguir actualizandose solo;
-     * `manual` = lo escribio una persona en el CRM y NADIE lo pisa.
+     * `manual` = lo escribio una persona en el CRM y NADIE lo pisa;
+     * `agente` = lo dijo el cliente y lo guardo el agente (modulo de la
+     * agencia NOMBRE_REAL): el perfil ya no lo pisa, una persona si.
      *
      * Existe porque las dos cosas se necesitan a la vez: un contacto que
      * cambia su nombre de WhatsApp tiene que reflejarse (#51), y el operador
      * que renombro a alguien como "Juan - obra Polanco" no puede perder ese
      * trabajo con el siguiente mensaje.
      */
-    nameSource: text("name_source", { enum: ["perfil", "manual"] })
+    nameSource: text("name_source", { enum: ["perfil", "manual", "agente"] })
       .notNull()
       .default("perfil"),
     notes: text("notes"),

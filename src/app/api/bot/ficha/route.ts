@@ -4,6 +4,8 @@ import { getDb, schema } from "@/lib/db";
 import { apiError, parseBody } from "@/lib/api";
 import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { upsertFicha } from "@/server/bot/ficha";
+import { publish } from "@/server/events/bus";
+import { nombreDeLaFicha, nombreRealEnabled, ponerNombreReal } from "@/server/nombre-real";
 
 export const dynamic = "force-dynamic";
 
@@ -51,5 +53,22 @@ export async function PUT(req: Request) {
     ficha: body.data.ficha,
   });
   if (!result) return apiError(404, "not_found", "Contacto no encontrado");
+
+  // Módulo de la agencia: el cliente dijo su nombre (o el de su empresa).
+  if (nombreRealEnabled()) {
+    const nombre = nombreDeLaFicha(body.data.ficha);
+    if (nombre) {
+      const cambio = await ponerNombreReal(organizationId, rows[0].contactId, nombre).catch((err) => {
+        console.warn(`[bot/ficha] no se pudo poner el nombre real: ${err}`);
+        return false;
+      });
+      if (cambio) {
+        publish(organizationId, {
+          type: "conversation.updated",
+          data: { conversation: { id: body.data.conversationId } },
+        });
+      }
+    }
+  }
   return Response.json(result);
 }

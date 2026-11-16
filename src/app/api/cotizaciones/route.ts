@@ -6,6 +6,8 @@ import { aDto, guardarBorrador, leerConfig, listarCotizaciones } from "@/server/
 import { pedidosEnabled } from "@/server/pedidos/flag";
 import { listarPedidos } from "@/server/pedidos/store";
 import { folioDe } from "@/lib/pedidos";
+import { aNombreDe } from "@/server/nombre-real";
+import { contactoDeConversacion } from "@/server/cotizaciones/store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,12 +22,14 @@ export const GET = withAuth(async (session, req: Request) => {
     leerConfig(org),
     conPedidos ? listarPedidos(org, { conversationId }) : Promise.resolve([]),
   ]);
+  const contacto = conversationId ? await contactoDeConversacion(org, conversationId).catch(() => null) : null;
   // Qué cotización ya tiene pedido (para no ofrecer crear otro).
   const pedidoDeCotizacion: Record<string, string> = {};
   for (const p of pedidos) if (p.cotizacionId) pedidoDeCotizacion[p.cotizacionId] ??= folioDe(p.numero);
   return Response.json({
     cotizaciones,
     pedidosActivos: conPedidos,
+    aNombreDe: contacto ? aNombreDe(contacto.ficha, contacto.nombre) : null,
     pedidoDeCotizacion,
     productos: config.productos,
     condiciones: {

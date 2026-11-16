@@ -207,7 +207,13 @@ export async function listarCotizaciones(
 export async function contactoDeConversacion(
   organizationId: string,
   conversationId: string
-): Promise<{ contactId: string; nombre: string; windowOpen: boolean | null; isTest: boolean } | null> {
+): Promise<{
+  contactId: string;
+  nombre: string;
+  windowOpen: boolean | null;
+  isTest: boolean;
+  ficha: Record<string, unknown> | null;
+} | null> {
   const [f] = await getDb()
     .select({ conversation: schema.conversation, contact: schema.contact })
     .from(schema.conversation)
@@ -220,6 +226,7 @@ export async function contactoDeConversacion(
     nombre: f.contact.name,
     windowOpen: null,
     isTest: f.conversation.isTest,
+    ficha: f.contact.ficha ?? null,
   };
 }
 
