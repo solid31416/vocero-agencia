@@ -56,6 +56,25 @@ export const ETAPAS_POR_DEFECTO: Etapa[] = [
   },
 ];
 
+/* Recordar el saldo al cliente (2026-11-16) */
+export const TEXTO_SALDO_POR_DEFECTO =
+  "Hola {nombre}, te recordamos que queda un saldo de {saldo} de tu pedido {folio}. Cuando lo tengas listo, mándanos tu comprobante por aquí. ¡Gracias!";
+/** Para dar de alta en Plantillas (Utilidad): {{1}} nombre, {{2}} saldo, {{3}} folio. */
+export const PLANTILLA_SALDO_SUGERIDA =
+  "Hola {{1}}, te recordamos que queda un saldo de {{2}} de tu pedido {{3}}. Cuando lo tengas listo, mándanos tu comprobante por este medio. ¡Gracias!";
+/** Si el revisor estuvo apagado, un recordatorio con más de estos días de atraso ya no sale solo. */
+export const DIAS_GRACIA_SALDO = 3;
+
+export const recordarSaldoSchema = z.object({
+  activo: z.boolean().default(false),
+  texto: z.string().trim().min(1).max(MAX_MENSAJE).default(TEXTO_SALDO_POR_DEFECTO),
+  plantillaId: z.string().trim().max(60).nullable().default(null),
+  /** Hora del negocio a la que sale el día de cobro. */
+  hora: z.coerce.number().int().min(6).max(21).default(10),
+});
+export type RecordarSaldo = z.infer<typeof recordarSaldoSchema>;
+export const RECORDAR_SALDO_POR_DEFECTO: RecordarSaldo = recordarSaldoSchema.parse({});
+
 export const configSchema = z
   .object({
     etapas: z.array(etapaSchema).min(MIN_ETAPAS).max(MAX_ETAPAS).default(ETAPAS_POR_DEFECTO),
@@ -63,6 +82,8 @@ export const configSchema = z
     plantillaId: z.string().trim().max(60).nullable().default(null),
     /** Anotar el estado en la ficha del contacto (el agente la lee). */
     actualizarFicha: z.boolean().default(true),
+    /** Recordarle el saldo al cliente el día de cobro. */
+    recordarSaldo: recordarSaldoSchema.default(RECORDAR_SALDO_POR_DEFECTO),
   })
   .refine((c) => new Set(c.etapas.map((e) => e.id)).size === c.etapas.length, {
     message: "Dos etapas no pueden tener la misma clave",
@@ -196,6 +217,47 @@ export function mensajeDePago(v: {
   return `${hola}recibimos tu pago de ${v.monto} para tu pedido ${v.folio}. ¡Gracias!${resto}`;
 }
 
+/** El recordatorio de saldo con {nombre} {saldo} {folio} {concepto} llenos. */
+export function textoDeSaldo(
+  plantilla: string,
+  v: { contacto: string; saldo: string; folio: string; concepto: string }
+): string {
+  const nombre = primerNombre(v.contacto);
+  return plantilla
+    .replace(/\{nombre\}/g, nombre)
+    .replace(/\{saldo\}/g, v.saldo)
+    .replace(/\{folio\}/g, v.folio)
+    .replace(/\{concepto\}/g, v.concepto)
+    .replace(/\s+,/g, ",")
+    .replace(/Hola ,/g, "Hola,")
+    .trim();
+}
+
+function diasEntre(desde: string, hasta: string): number {
+  return Math.round((Date.parse(`${hasta}T00:00:00Z`) - Date.parse(`${desde}T00:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * ¿Sale hoy el recordatorio de saldo? El día de cobro a partir de la hora
+ * elegida (o después, si se pasó), una sola vez por fecha de cobro, y no si
+ * ya pasaron más de DIAS_GRACIA_SALDO días.
+ */
+export function tocaRecordarSaldo(v: {
+  saldo: number | null;
+  cobrarSaldoEl: string | null;
+  /** Para qué fecha de cobro ya salió (o se intentó). */
+  recordadoPara: string | null;
+  hoy: string;
+  horaLocal: number;
+  hora: number;
+}): boolean {
+  if (v.saldo === null || v.saldo <= 0 || !v.cobrarSaldoEl) return false;
+  if (v.recordadoPara === v.cobrarSaldoEl) return false;
+  if (v.cobrarSaldoEl > v.hoy) return false;
+  if (diasEntre(v.cobrarSaldoEl, v.hoy) > DIAS_GRACIA_SALDO) return false;
+  return v.cobrarSaldoEl < v.hoy || v.horaLocal >= v.hora;
+}
+
 /** Toca cobrar el saldo: hay saldo y ya llegó (o pasó) la fecha de cobro. */
 export function tocaCobrar(saldo: number | null, cobrarSaldoEl: string | null, hoy: string): boolean {
   return saldo !== null && saldo > 0 && cobrarSaldoEl !== null && cobrarSaldoEl <= hoy;
@@ -252,6 +314,8 @@ export type PedidoDto = {
   cobrarSaldoEl: string | null;
   /** Hay saldo y ya llegó la fecha de cobrarlo. */
   tocaCobrar: boolean;
+  /** El último recordatorio de saldo al cliente: para qué fecha de cobro, cuándo y cómo salió. */
+  saldoRecordado: { para: string; en: string; ok: boolean; detalle: string | null } | null;
   creadoEn: string;
   actualizadoEn: string;
 };

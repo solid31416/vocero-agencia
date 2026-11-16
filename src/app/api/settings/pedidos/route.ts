@@ -59,5 +59,27 @@ export const PUT = withAuth(async (session, req: Request) => {
       );
     }
   }
+  const saldoTpl = c.recordarSaldo.plantillaId;
+  if (saldoTpl) {
+    const [t] = await getDb()
+      .select({ body: schema.template.body })
+      .from(schema.template)
+      .where(
+        scoped(
+          schema.template.organizationId,
+          session.organizationId,
+          and(eq(schema.template.id, saldoTpl), eq(schema.template.status, "approved"))
+        )
+      )
+      .limit(1);
+    if (!t) return apiError(422, "plantilla_invalida", "Elige una plantilla aprobada por Meta para el saldo");
+    if (countVariables(t.body) > 3) {
+      return apiError(
+        422,
+        "plantilla_invalida",
+        "La plantilla del saldo puede usar hasta 3 variables: {{1}} nombre, {{2}} saldo, {{3}} folio"
+      );
+    }
+  }
   return Response.json({ config: await guardarConfig(session.organizationId, c) });
 });

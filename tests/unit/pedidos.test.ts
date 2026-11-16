@@ -9,6 +9,8 @@ import {
   resumenPagos,
   tipoDePago,
   tocaCobrar,
+  tocaRecordarSaldo,
+  textoDeSaldo,
   cambioSchema,
   claveDeEtapa,
   configSchema,
@@ -209,5 +211,45 @@ describe("anticipo y saldo", () => {
         pagos: { pagado: "$72,500.00", saldo: "$72,500.00", liquidado: false },
       })
     ).toBe("PED-0001 · Domo Mini · estado: En fabricación · pagado: $72,500.00, falta: $72,500.00");
+  });
+});
+
+describe("recordar el saldo al cliente", () => {
+  const base = { saldo: 45000, cobrarSaldoEl: "2026-11-20", recordadoPara: null, hoy: "2026-11-20", horaLocal: 10, hora: 10 };
+
+  it("sale el día de cobro a partir de la hora elegida", () => {
+    expect(tocaRecordarSaldo(base)).toBe(true);
+    expect(tocaRecordarSaldo({ ...base, horaLocal: 9 })).toBe(false);
+    expect(tocaRecordarSaldo({ ...base, hoy: "2026-11-19" })).toBe(false);
+  });
+
+  it("una sola vez por fecha de cobro; si cambia la fecha, vuelve a salir", () => {
+    expect(tocaRecordarSaldo({ ...base, recordadoPara: "2026-11-20" })).toBe(false);
+    expect(tocaRecordarSaldo({ ...base, recordadoPara: "2026-11-10" })).toBe(true);
+  });
+
+  it("atrasado sale a cualquier hora, pero no después de 3 días", () => {
+    expect(tocaRecordarSaldo({ ...base, hoy: "2026-11-22", horaLocal: 7 })).toBe(true);
+    expect(tocaRecordarSaldo({ ...base, hoy: "2026-11-24" })).toBe(false);
+  });
+
+  it("sin saldo, no", () => {
+    expect(tocaRecordarSaldo({ ...base, saldo: 0 })).toBe(false);
+    expect(tocaRecordarSaldo({ ...base, saldo: null })).toBe(false);
+  });
+
+  it("el texto con sus datos", () => {
+    expect(
+      textoDeSaldo("Hola {nombre}, te falta {saldo} de {folio} ({concepto}).", {
+        contacto: "Saúl Garza — Domos Garza",
+        saldo: "$45,000.00",
+        folio: "PED-0003",
+        concepto: "Domo Mini",
+      })
+    ).toBe("Hola Saúl, te falta $45,000.00 de PED-0003 (Domo Mini).");
+  });
+
+  it("la configuración vieja se lee con el recordatorio apagado", () => {
+    expect(configSchema.parse({}).recordarSaldo.activo).toBe(false);
   });
 });

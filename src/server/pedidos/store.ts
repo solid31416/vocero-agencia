@@ -51,6 +51,11 @@ export const pedido = pgTable("agencia_pedido", {
   /** Anticipo y saldo: los pagos recibidos, en orden. */
   pagos: jsonb("pagos").$type<Pago[]>().notNull().default([]),
   cobrarSaldoEl: date("cobrar_saldo_el", { mode: "string" }),
+  /** Recordatorio de saldo al cliente: para qué fecha de cobro salió, cuándo y cómo. */
+  saldoRecordadoPara: date("saldo_recordado_para", { mode: "string" }),
+  saldoRecordadoEn: timestamp("saldo_recordado_en"),
+  saldoRecordadoOk: boolean("saldo_recordado_ok"),
+  saldoRecordadoDetalle: text("saldo_recordado_detalle"),
   borrado: boolean("borrado").notNull().default(false),
   creadoPor: text("creado_por"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -107,6 +112,11 @@ async function crear(): Promise<void> {
   // Anticipo y saldo (2026-11-16): columnas nuevas, aditivas.
   await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS pagos jsonb NOT NULL DEFAULT '[]'::jsonb`);
   await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS cobrar_saldo_el date`);
+  // Recordar el saldo al cliente (2026-11-16).
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_para date`);
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_en timestamp`);
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_ok boolean`);
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_detalle text`);
 }
 
 /** Hoy en AAAA-MM-DD, en la zona de México (el negocio). */
@@ -148,6 +158,15 @@ export function aDto(f: FilaPedido, config: ConfigPedidos): PedidoDto {
     liquidado: r.liquidado,
     cobrarSaldoEl: f.cobrarSaldoEl ?? null,
     tocaCobrar: tocaCobrar(r.saldo, f.cobrarSaldoEl ?? null, hoyIso()),
+    saldoRecordado:
+      f.saldoRecordadoPara && f.saldoRecordadoEn
+        ? {
+            para: f.saldoRecordadoPara,
+            en: f.saldoRecordadoEn.toISOString(),
+            ok: Boolean(f.saldoRecordadoOk),
+            detalle: f.saldoRecordadoDetalle ?? null,
+          }
+        : null,
     id: f.id,
     folio: folioDe(f.numero),
     conversationId: f.conversationId,

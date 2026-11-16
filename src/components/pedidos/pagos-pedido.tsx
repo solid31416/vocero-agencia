@@ -93,6 +93,21 @@ export function PagosPedido({
     onCambio(d.pedido);
   }
 
+  async function recordarAhora() {
+    setOcupado(true);
+    setAviso(null);
+    const res = await fetch(`/api/pedidos/${pedido.id}/recordar-saldo`, { method: "POST" }).catch(() => null);
+    setOcupado(false);
+    const d = (await res?.json().catch(() => null)) as {
+      detalle?: string;
+      pedido?: PedidoDto | null;
+      error?: { message?: string };
+    } | null;
+    if (!res?.ok) return setAviso({ ok: false, texto: d?.error?.message ?? "No se pudo mandar el recordatorio" });
+    setAviso({ ok: true, texto: `Recordatorio de saldo enviado (${(d?.detalle ?? "").toLowerCase()}).` });
+    if (d?.pedido) onCambio(d.pedido);
+  }
+
   async function guardarCobro() {
     setOcupado(true);
     const res = await fetch(`/api/pedidos/${pedido.id}`, {
@@ -259,6 +274,21 @@ export function PagosPedido({
           >
             Guardar
           </Button>
+          <Button size="sm" variant="ghost" disabled={ocupado} onClick={() => void recordarAhora()}>
+            Recordárselo ahora
+          </Button>
+          {pedido.saldoRecordado && (
+            <p className={cn("w-full text-xs", pedido.saldoRecordado.ok ? "text-text-3" : "text-warning-text")}>
+              {pedido.saldoRecordado.ok ? "Se le recordó el saldo" : "No salió el recordatorio de saldo"} el{" "}
+              {new Date(pedido.saldoRecordado.en).toLocaleString("es-MX", {
+                day: "numeric",
+                month: "short",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+              {pedido.saldoRecordado.detalle ? ` · ${pedido.saldoRecordado.detalle}` : ""}
+            </p>
+          )}
         </div>
       )}
 

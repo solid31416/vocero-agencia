@@ -14,8 +14,10 @@ import {
   MAX_ETAPAS,
   MAX_MENSAJE,
   MIN_ETAPAS,
+  PLANTILLA_SALDO_SUGERIDA,
   PLANTILLA_SUGERIDA,
   armarMensaje,
+  textoDeSaldo,
   claveDeEtapa,
   type ConfigPedidos,
   type Etapa,
@@ -229,6 +231,97 @@ export function PedidosAjustesClient() {
             (categoría Utilidad) con este texto: {"{{1}}"} nombre, {"{{2}}"} folio, {"{{3}}"} etapa.
           </p>
           <p className="rounded-md bg-subtle p-2 font-mono text-xs">{PLANTILLA_SUGERIDA}</p>
+        </div>
+
+        <div className="space-y-3 border-t pt-4" data-recordar-saldo>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <Label>Recordarle el saldo al cliente</Label>
+              <p className="text-xs text-muted-foreground">
+                El día que pongas en «Cobrar el saldo el…» de un pedido, a la hora que elijas, se le escribe al
+                cliente cuánto le falta. Una sola vez por fecha; también puedes mandarlo a mano desde el pedido.
+              </p>
+            </div>
+            <Switch
+              checked={config.recordarSaldo.activo}
+              onCheckedChange={(v) => cambiar({ recordarSaldo: { ...config.recordarSaldo, activo: v } })}
+              label="Recordarle el saldo al cliente"
+              disabled={!editable}
+            />
+          </div>
+          {config.recordarSaldo.activo && (
+            <div className="space-y-3 rounded-md border p-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="saldo-hora">Hora a la que sale</Label>
+                <select
+                  id="saldo-hora"
+                  value={config.recordarSaldo.hora}
+                  disabled={!editable}
+                  onChange={(e) =>
+                    cambiar({ recordarSaldo: { ...config.recordarSaldo, hora: Number(e.target.value) } })
+                  }
+                  className="h-9 w-40 rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  {Array.from({ length: 16 }, (_, i) => i + 6).map((h) => (
+                    <option key={h} value={h}>
+                      {h}:00
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="saldo-texto">Mensaje (si el cliente escribió en las últimas 24 h)</Label>
+                <Textarea
+                  id="saldo-texto"
+                  rows={2}
+                  maxLength={MAX_MENSAJE}
+                  value={config.recordarSaldo.texto}
+                  disabled={!editable}
+                  onChange={(e) => cambiar({ recordarSaldo: { ...config.recordarSaldo, texto: e.target.value } })}
+                />
+                <p className="rounded-md bg-subtle p-2 text-sm">
+                  <span className="text-xs text-muted-foreground">Así se ve: </span>
+                  {textoDeSaldo(config.recordarSaldo.texto, {
+                    contacto: EJEMPLO.contacto,
+                    saldo: "$45,000.00",
+                    folio: EJEMPLO.folio,
+                    concepto: EJEMPLO.concepto,
+                  })}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Usa <code>{"{nombre}"}</code>, <code>{"{saldo}"}</code>, <code>{"{folio}"}</code> y{" "}
+                  <code>{"{concepto}"}</code>.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="saldo-plantilla">Plantilla (si pasaron más de 24 h)</Label>
+                <select
+                  id="saldo-plantilla"
+                  value={config.recordarSaldo.plantillaId ?? ""}
+                  disabled={!editable}
+                  onChange={(e) =>
+                    cambiar({ recordarSaldo: { ...config.recordarSaldo, plantillaId: e.target.value || null } })
+                  }
+                  className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
+                >
+                  <option value="">Sin plantilla: con la ventana cerrada no sale</option>
+                  {datos.plantillas.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.language} · {p.category})
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  Da de alta una en{" "}
+                  <Link href="/settings/templates" className="font-medium text-brand-text underline underline-offset-2">
+                    Plantillas
+                  </Link>{" "}
+                  (categoría Utilidad) con este texto: {"{{1}}"} nombre, {"{{2}}"} saldo, {"{{3}}"} folio.
+                </p>
+                <p className="rounded-md bg-subtle p-2 font-mono text-xs">{PLANTILLA_SALDO_SUGERIDA}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {editable && (

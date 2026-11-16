@@ -38,5 +38,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: cotizaciones — el «sí» del cliente y el seguimiento sin respuesta (COTIZACIONES).
     const { iniciarRevisorCotizaciones } = await import("./server/cotizaciones/revisor");
     iniciarRevisorCotizaciones();
+    // Módulo de la agencia: recordarle el saldo al cliente el día de cobro (PEDIDOS).
+    const { iniciarRecordarSaldo } = await import("./server/pedidos/recordar-saldo");
+    iniciarRecordarSaldo();
   }
 }
