@@ -1,6 +1,6 @@
 import { withAuth } from "@/lib/api";
 import { bibliotecaEnabled } from "@/server/biblioteca/flag";
-import { leerArchivo, leerBinario } from "@/server/biblioteca/store";
+import { leerBinario, leerPartes } from "@/server/biblioteca/store";
 
 export const dynamic = "force-dynamic";
 
@@ -8,14 +8,17 @@ type Params = { params: Promise<{ id: string }> };
 
 /**
  * El archivo, para verlo en la pantalla (miniatura, video, PDF). Acepta
- * `Range`: Safari no reproduce un video sin poder pedirlo por partes.
+ * `Range`: Safari no reproduce un video sin poder pedirlo por partes. Con
+ * `?n=2` da la tercera foto de un producto de varias (sin `n`, la primera).
  */
 export const GET = withAuth(async (session, req: Request, ctx: Params) => {
   if (!bibliotecaEnabled()) return new Response(null, { status: 404 });
   const { id } = await ctx.params;
-  const fila = await leerArchivo(session.organizationId, id);
+  const partes = await leerPartes(session.organizationId, id);
+  const n = Number(new URL(req.url).searchParams.get("n") ?? "0");
+  const fila = Number.isInteger(n) && n >= 0 ? partes?.[n] : undefined;
   if (!fila) return new Response(null, { status: 404 });
-  const data = await leerBinario(session.organizationId, id).catch(() => null);
+  const data = await leerBinario(session.organizationId, fila.id).catch(() => null);
   if (!data) return new Response(null, { status: 404 });
 
   const base = {

@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  MAX_BYTES_SUBIDA,
   MAX_ENVIOS_POR_DIA,
+  MAX_PARTES,
   MAX_VECES_POR_ARCHIVO,
   bloqueoDeEnvio,
   detectarMime,
   paraElAgente,
   problemaDelArchivo,
+  problemaDelLote,
   tipoDe,
 } from "@/lib/biblioteca";
 import { HERRAMIENTAS, herramientasEfectivas } from "@/lib/agent-roles";
@@ -83,5 +86,27 @@ describe("biblioteca: lo que ve y puede hacer el agente", () => {
       settingsSections({ biblioteca: on }).flatMap((s) => s.links.map((l) => l.href));
     expect(links(true)).toContain("/settings/biblioteca");
     expect(links(false)).not.toContain("/settings/biblioteca");
+  });
+});
+
+describe("biblioteca: varias fotos del mismo producto", () => {
+  it("revisa cuántas son y cuánto pesan juntas", () => {
+    expect(problemaDelLote([])).toMatch(/al menos una/);
+    expect(problemaDelLote([1000, 2000, 3000, 4000, 5000])).toBeNull();
+    expect(problemaDelLote(Array.from({ length: MAX_PARTES }, () => 1000))).toBeNull();
+    expect(problemaDelLote(Array.from({ length: MAX_PARTES + 1 }, () => 1000))).toMatch(/Máximo/);
+    expect(problemaDelLote([MAX_BYTES_SUBIDA, 1])).toMatch(/Juntos pesan/);
+  });
+
+  it("el agente sabe cuántas salen juntas (1 si no se dice)", () => {
+    const base = { titulo: "Domo Mini", cuando: "", tipo: "foto" as const, activo: true };
+    const r = paraElAgente(
+      [
+        { ...base, id: "bib_a", cantidad: 5 },
+        { ...base, id: "bib_b" },
+      ],
+      new Set()
+    );
+    expect(r.map((a) => a.cantidad)).toEqual([5, 1]);
   });
 });

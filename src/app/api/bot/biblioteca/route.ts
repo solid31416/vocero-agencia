@@ -59,5 +59,11 @@ export async function POST(req: Request) {
     esPrueba: conv.isTest,
   });
   if (!r.ok) return apiError(r.status, r.codigo, r.detalle);
-  return Response.json({ messageId: r.messageId, titulo: r.titulo, status: "sent" });
+  return Response.json({
+    messageId: r.messageId,
+    titulo: r.titulo,
+    status: "sent",
+    enviados: r.enviados,
+    total: r.total,
+  });
 }

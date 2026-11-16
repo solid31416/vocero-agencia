@@ -10,6 +10,7 @@ import {
   enviadosDesde,
   leerArchivo,
   leerBinario,
+  leerPartes,
   listarArchivos,
   registrarEnvio,
 } from "./store";
@@ -47,12 +48,17 @@ export async function archivosParaElAgente(
 }
 
 export type ResultadoEnvio =
-  | { ok: true; messageId: string; titulo: string }
+  | { ok: true; messageId: string; titulo: string; enviados: number; total: number }
   | { ok: false; status: number; codigo: string; detalle: string };
 
 const DIA_MS = 24 * 60 * 60 * 1000;
 
-/** El agente manda un archivo de la biblioteca a una conversación. */
+/**
+ * El agente manda un archivo de la biblioteca a una conversación. Si el
+ * producto tiene varias fotos salen todas, una tras otra, y cuentan como UN
+ * envío para los topes. Si falla la primera, es error; si falla una de las
+ * siguientes, se para ahí y se reporta cuántas salieron.
+ */
 export async function enviarDelAgente(input: {
   organizationId: string;
   conversationId: string;
@@ -69,7 +75,8 @@ export async function enviarDelAgente(input: {
     };
   }
   const fila = await leerArchivo(organizationId, archivoId);
-  if (!fila) {
+  const partes = fila ? await leerPartes(organizationId, archivoId) : null;
+  if (!fila || !partes || partes.length === 0) {
     return { ok: false, status: 404, codigo: "archivo_desconocido", detalle: "Ese archivo no está en la biblioteca" };
   }
   const hoy = await enviadosDesde(organizationId, conversationId, new Date(Date.now() - DIA_MS));
@@ -85,32 +92,56 @@ export async function enviarDelAgente(input: {
     const guardada = await guardarRespuestaDePrueba({
       organizationId,
       conversationId,
-      text: `📎 [Archivo de la biblioteca: ${fila.titulo}]`,
+      text:
+        partes.length > 1
+          ? `📎 [Biblioteca: ${fila.titulo} · ${partes.length} archivos]`
+          : `📎 [Archivo de la biblioteca: ${fila.titulo}]`,
     });
     await registrarEnvio({ organizationId, archivoId, conversationId, messageId: guardada.messageId });
-    return { ok: true, messageId: guardada.messageId, titulo: fila.titulo };
+    return {
+      ok: true,
+      messageId: guardada.messageId,
+      titulo: fila.titulo,
+      enviados: partes.length,
+      total: partes.length,
+    };
   }
 
-  let data: Buffer;
-  try {
-    data = await leerBinario(organizationId, archivoId);
-  } catch {
-    return { ok: false, status: 410, codigo: "archivo_perdido", detalle: "El archivo ya no está en el servidor" };
-  }
-  try {
-    const r = await sendMediaMessage({
-      conversationId,
-      organizationId,
-      file: { data, mimeType: fila.mime, fileName: fila.nombreArchivo },
-      aiGenerated: true,
-    });
-    await registrarEnvio({ organizationId, archivoId, conversationId, messageId: r.messageId });
-    return { ok: true, messageId: r.messageId, titulo: fila.titulo };
-  } catch (err) {
-    if (err instanceof SendError) {
-      const status = err.code === "upload_failed" || err.code === "meta_unavailable" ? 502 : 409;
-      return { ok: false, status, codigo: err.code, detalle: err.message };
+  let primerMensaje: string | null = null;
+  let enviados = 0;
+  for (const parte of partes) {
+    let data: Buffer;
+    try {
+      data = await leerBinario(organizationId, parte.id);
+    } catch {
+      if (enviados === 0) {
+        return { ok: false, status: 410, codigo: "archivo_perdido", detalle: "El archivo ya no está en el servidor" };
+      }
+      break;
     }
-    throw err;
+    try {
+      const r = await sendMediaMessage({
+        conversationId,
+        organizationId,
+        file: { data, mimeType: parte.mime, fileName: parte.nombreArchivo },
+        aiGenerated: true,
+      });
+      primerMensaje ??= r.messageId;
+      enviados += 1;
+    } catch (err) {
+      if (!(err instanceof SendError)) {
+        if (enviados === 0) throw err;
+        console.warn(`[biblioteca] la parte ${enviados + 1} de ${archivoId} falló: ${err}`);
+        break;
+      }
+      if (enviados === 0) {
+        const status = err.code === "upload_failed" || err.code === "meta_unavailable" ? 502 : 409;
+        return { ok: false, status, codigo: err.code, detalle: err.message };
+      }
+      console.warn(`[biblioteca] la parte ${enviados + 1} de ${archivoId} falló: ${err.code}`);
+      break;
+    }
   }
+  await registrarEnvio({ organizationId, archivoId, conversationId, messageId: primerMensaje });
+  return { ok: true, messageId: primerMensaje!, titulo: fila.titulo, enviados, total: partes.length };
 }

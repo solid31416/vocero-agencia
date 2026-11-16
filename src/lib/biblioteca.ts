@@ -31,6 +31,14 @@ export const MAX_TITULO = 80;
 export const MAX_CUANDO = 300;
 /** Cuántos archivos puede tener la biblioteca de un negocio. */
 export const MAX_ARCHIVOS = 60;
+/**
+ * Cuántas fotos (o videos) puede llevar UN archivo de la biblioteca: varias
+ * vistas del mismo producto que el agente manda juntas. El dueño pidió al
+ * menos 5; 10 deja aire sin que el envío tarde demasiado.
+ */
+export const MAX_PARTES = 10;
+/** Lo que pueden pesar juntas las partes de un archivo al subirlas. */
+export const MAX_BYTES_SUBIDA = 60 * 1024 * 1024;
 /** Cuántos archivos puede mandar el agente en una conversación en 24 horas. */
 export const MAX_ENVIOS_POR_DIA = 6;
 /**
@@ -51,6 +59,10 @@ export type ArchivoDto = {
   activo: boolean;
   envios: number;
   creadoEn: string;
+  /** Cuántas fotos/videos lleva (1 = un solo archivo). */
+  cantidad: number;
+  /** Cada parte, en orden: la 0 es la principal. Para las miniaturas. */
+  partes: { n: number; tipo: TipoArchivo; tamano: number }[];
 };
 
 /** Lo que recibe el agente en el contexto del turno. */
@@ -60,6 +72,8 @@ export type ArchivoParaAgente = {
   cuando: string;
   tipo: TipoArchivo;
   yaEnviado: boolean;
+  /** Cuántas fotos/videos salen juntos al mandarlo (1 = uno solo). */
+  cantidad: number;
 };
 
 export const metaSchema = z.object({
@@ -123,7 +137,7 @@ export function pesoLegible(bytes: number): string {
  * elegir (título y cuándo) y si ya se mandó en esta conversación.
  */
 export function paraElAgente(
-  archivos: readonly Pick<ArchivoDto, "id" | "titulo" | "cuando" | "tipo" | "activo">[],
+  archivos: readonly (Pick<ArchivoDto, "id" | "titulo" | "cuando" | "tipo" | "activo"> & { cantidad?: number })[],
   yaEnviados: ReadonlySet<string>
 ): ArchivoParaAgente[] {
   return archivos
@@ -134,7 +148,22 @@ export function paraElAgente(
       cuando: a.cuando,
       tipo: a.tipo,
       yaEnviado: yaEnviados.has(a.id),
+      cantidad: a.cantidad ?? 1,
     }));
+}
+
+/**
+ * Revisa el lote de una subida (varias fotos del mismo producto): cuántas son
+ * y cuánto pesan juntas. Cada una se revisa aparte con `problemaDelArchivo`.
+ */
+export function problemaDelLote(tamanos: readonly number[]): string | null {
+  if (tamanos.length === 0) return "Elige al menos una foto, un video o un PDF";
+  if (tamanos.length > MAX_PARTES) return `Máximo ${MAX_PARTES} archivos por producto`;
+  const total = tamanos.reduce((a, b) => a + b, 0);
+  if (total > MAX_BYTES_SUBIDA) {
+    return `Juntos pesan ${pesoLegible(total)}; el máximo es ${pesoLegible(MAX_BYTES_SUBIDA)}. Sube menos o más ligeros`;
+  }
+  return null;
 }
 
 /** Por qué el agente no puede mandar este archivo ahora; null si puede. */

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { FileText, ImageIcon, Pencil, Trash2, Upload, Video } from "lucide-react";
+import { ChevronDown, FileText, ImageIcon, Pencil, Trash2, Upload, Video, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   detectarMime,
   pesoLegible,
   problemaDelArchivo,
+  problemaDelLote,
   type ArchivoDto,
 } from "@/lib/biblioteca";
 
@@ -28,7 +29,13 @@ import {
  * elegir.
  */
 
-type Datos = { archivos: ArchivoDto[]; puedeEditar: boolean; maxArchivos: number };
+type Datos = {
+  archivos: ArchivoDto[];
+  productos: string[];
+  puedeEditar: boolean;
+  maxArchivos: number;
+  maxPartes: number;
+};
 type Aviso = { ok: boolean; texto: string } | null;
 
 const ICONO = { foto: ImageIcon, video: Video, documento: FileText } as const;
@@ -72,6 +79,8 @@ export function BibliotecaClient() {
         <Subir
           lleno={datos.archivos.length >= datos.maxArchivos}
           maxArchivos={datos.maxArchivos}
+          maxPartes={datos.maxPartes ?? 10}
+          productos={datos.productos ?? []}
           onSubido={() => void cargar()}
         />
       )}
@@ -95,6 +104,7 @@ export function BibliotecaClient() {
               key={a.id}
               archivo={a}
               editable={datos.puedeEditar}
+              productos={datos.productos ?? []}
               onCambio={() => void cargar()}
               onAviso={setAviso}
             />
@@ -108,51 +118,201 @@ export function BibliotecaClient() {
   );
 }
 
-function Subir({ lleno, maxArchivos, onSubido }: { lleno: boolean; maxArchivos: number; onSubido: () => void }) {
+/** Lo que se le sugiere al agente al elegir un producto, si «cuándo» está vacío. */
+function cuandoDelProducto(producto: string): string {
+  return `Cuando pregunten por el ${producto}, pidan fotos o quieran ver cómo se ve.`.slice(0, MAX_CUANDO);
+}
+
+/**
+ * El título: se escribe o se elige de la lista de productos (Ajustes →
+ * Cotizaciones). Al hacer clic se abre la lista; al escribir, se filtra.
+ */
+function TituloConProductos({
+  id,
+  value,
+  productos,
+  onChange,
+  onElegir,
+}: {
+  id?: string;
+  value: string;
+  productos: string[];
+  onChange: (v: string) => void;
+  onElegir: (producto: string) => void;
+}) {
+  const [abierta, setAbierta] = useState(false);
+  const filtro = value.trim().toLowerCase();
+  const visibles = productos.filter((p) => !filtro || p.toLowerCase().includes(filtro));
+  const lista = visibles.length > 0 ? visibles : productos;
+
+  return (
+    <div className="relative">
+      <Input
+        id={id}
+        value={value}
+        maxLength={MAX_TITULO}
+        autoComplete="off"
+        placeholder={productos.length > 0 ? "Elige un producto o escribe el título" : "Ventanal Panorámico, de noche"}
+        aria-label="Título"
+        role={productos.length > 0 ? "combobox" : undefined}
+        aria-expanded={productos.length > 0 ? abierta : undefined}
+        className={productos.length > 0 ? "pr-9" : undefined}
+        onFocus={() => setAbierta(true)}
+        onClick={() => setAbierta(true)}
+        onBlur={() => setAbierta(false)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") setAbierta(false);
+        }}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setAbierta(true);
+        }}
+      />
+      {productos.length > 0 && (
+        <button
+          type="button"
+          tabIndex={-1}
+          aria-label="Ver productos"
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setAbierta((v) => !v);
+          }}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </button>
+      )}
+      {abierta && productos.length > 0 && (
+        <ul
+          role="listbox"
+          className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-md border bg-popover p-1 text-sm shadow-md"
+        >
+          {lista.map((p) => (
+            <li key={p}>
+              <button
+                type="button"
+                role="option"
+                aria-selected={p === value}
+                className={cn(
+                  "w-full rounded px-2 py-1.5 text-left hover:bg-muted",
+                  p === value && "bg-muted font-medium"
+                )}
+                // mousedown y no click: el blur del campo cerraría la lista antes.
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  onElegir(p);
+                  setAbierta(false);
+                }}
+              >
+                {p}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+type Elegido = { file: File; url: string | null };
+
+function Subir({
+  lleno,
+  maxArchivos,
+  maxPartes,
+  productos,
+  onSubido,
+}: {
+  lleno: boolean;
+  maxArchivos: number;
+  maxPartes: number;
+  productos: string[];
+  onSubido: () => void;
+}) {
   const input = useRef<HTMLInputElement>(null);
-  const [archivo, setArchivo] = useState<File | null>(null);
+  const [elegidos, setElegidos] = useState<Elegido[]>([]);
   const [titulo, setTitulo] = useState("");
   const [cuando, setCuando] = useState("");
   const [subiendo, setSubiendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listo, setListo] = useState(false);
 
-  async function elegir(f: File | null) {
-    setError(null);
-    setListo(false);
-    setArchivo(null);
-    if (!f) return;
-    // Se revisa aquí lo mismo que en el servidor, para no esperar la subida.
-    const cabeza = new Uint8Array(await f.slice(0, 16).arrayBuffer());
-    const problema = problemaDelArchivo(detectarMime(cabeza), f.size);
-    if (problema) {
-      setError(problema);
-      if (input.current) input.current.value = "";
-      return;
-    }
-    setArchivo(f);
-    if (!titulo.trim()) setTitulo(f.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").slice(0, MAX_TITULO));
+  // Las miniaturas viven en memoria del navegador: se sueltan al salir.
+  const elegidosRef = useRef(elegidos);
+  elegidosRef.current = elegidos;
+  useEffect(
+    () => () => {
+      for (const e of elegidosRef.current) if (e.url) URL.revokeObjectURL(e.url);
+    },
+    []
+  );
+
+  function limpiarInput() {
+    if (input.current) input.current.value = "";
   }
 
+  async function agregar(lista: FileList | null) {
+    setError(null);
+    setListo(false);
+    const nuevos: Elegido[] = [];
+    const problemas: string[] = [];
+    for (const f of Array.from(lista ?? [])) {
+      // Se revisa aquí lo mismo que en el servidor, para no esperar la subida.
+      const cabeza = new Uint8Array(await f.slice(0, 16).arrayBuffer());
+      const mime = detectarMime(cabeza);
+      const problema = problemaDelArchivo(mime, f.size);
+      if (problema) {
+        problemas.push(`«${f.name}»: ${problema}`);
+        continue;
+      }
+      nuevos.push({ file: f, url: mime?.startsWith("image/") ? URL.createObjectURL(f) : null });
+    }
+    limpiarInput();
+    const cupo = maxPartes - elegidos.length;
+    const entran = nuevos.slice(0, Math.max(0, cupo));
+    for (const e of nuevos.slice(entran.length)) if (e.url) URL.revokeObjectURL(e.url);
+    if (nuevos.length > entran.length) problemas.push(`Máximo ${maxPartes} archivos por producto.`);
+    if (entran.length > 0) setElegidos((prev) => [...prev, ...entran]);
+    if (problemas.length > 0) setError(problemas.join(" "));
+  }
+
+  function quitar(i: number) {
+    setElegidos((prev) => {
+      const e = prev[i];
+      if (e?.url) URL.revokeObjectURL(e.url);
+      return prev.filter((_, j) => j !== i);
+    });
+  }
+
+  function elegirProducto(p: string) {
+    setTitulo(p.slice(0, MAX_TITULO));
+    if (!cuando.trim()) setCuando(cuandoDelProducto(p));
+  }
+
+  const pesoTotal = elegidos.reduce((t, e) => t + e.file.size, 0);
+  const problemaLote = elegidos.length > 0 ? problemaDelLote(elegidos.map((e) => e.file.size)) : null;
+
   async function subir() {
-    if (!archivo) return setError("Elige un archivo");
     if (!titulo.trim()) return setError("Ponle un título");
+    if (elegidos.length === 0) return setError("Elige al menos una foto, un video o un PDF");
+    if (problemaLote) return setError(problemaLote);
     setSubiendo(true);
     setError(null);
     const form = new FormData();
-    form.set("archivo", archivo);
     form.set("titulo", titulo.trim());
     form.set("cuando", cuando.trim());
+    for (const e of elegidos) form.append("archivo", e.file);
     const res = await fetch("/api/settings/biblioteca", { method: "POST", body: form }).catch(() => null);
     setSubiendo(false);
     if (!res?.ok) {
       const j = (await res?.json().catch(() => null)) as { error?: { message?: string } } | null;
-      return setError(j?.error?.message ?? "No se pudo subir el archivo");
+      return setError(j?.error?.message ?? "No se pudo subir. Revisa tu conexión e inténtalo otra vez.");
     }
-    setArchivo(null);
+    for (const e of elegidos) if (e.url) URL.revokeObjectURL(e.url);
+    setElegidos([]);
     setTitulo("");
     setCuando("");
-    if (input.current) input.current.value = "";
+    limpiarInput();
     setListo(true);
     onSubido();
   }
@@ -160,40 +320,37 @@ function Subir({ lleno, maxArchivos, onSubido }: { lleno: boolean; maxArchivos: 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Subir archivo</CardTitle>
-        <CardDescription>Foto JPG o PNG (hasta 5 MB), video MP4 (hasta 16 MB) o PDF (hasta 20 MB).</CardDescription>
+        <CardTitle>Subir producto</CardTitle>
+        <CardDescription>
+          Hasta {maxPartes} fotos o videos del mismo producto: el agente los manda todos juntos. Foto JPG o PNG (hasta 5
+          MB), video MP4 (hasta 16 MB) o PDF (hasta 20 MB).
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {lleno ? (
           <p className="text-sm text-warning-text">
-            La biblioteca ya tiene {maxArchivos} archivos. Borra alguno para subir otro.
+            La biblioteca ya tiene {maxArchivos} productos. Borra alguno para subir otro.
           </p>
         ) : (
           <>
             <div className="space-y-1.5">
-              <Label htmlFor="bib-archivo">Archivo</Label>
-              <Input
-                ref={input}
-                id="bib-archivo"
-                type="file"
-                accept={ACEPTA}
-                onChange={(e) => void elegir(e.target.files?.[0] ?? null)}
-              />
-              {archivo && (
-                <p className="text-xs text-muted-foreground">
-                  {archivo.name} · {pesoLegible(archivo.size)}
-                </p>
-              )}
-            </div>
-            <div className="space-y-1.5">
               <Label htmlFor="bib-titulo">Título</Label>
-              <Input
+              <TituloConProductos
                 id="bib-titulo"
                 value={titulo}
-                maxLength={MAX_TITULO}
-                placeholder="Ventanal Panorámico, de noche"
-                onChange={(e) => setTitulo(e.target.value)}
+                productos={productos}
+                onChange={setTitulo}
+                onElegir={elegirProducto}
               />
+              {productos.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Si das de alta tus productos en{" "}
+                  <Link href="/settings/cotizaciones" className="underline underline-offset-2">
+                    Ajustes → Cotizaciones
+                  </Link>
+                  , aquí los eliges con un clic.
+                </p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="bib-cuando">¿Cuándo debe mandarlo el agente?</Label>
@@ -206,10 +363,75 @@ function Subir({ lleno, maxArchivos, onSubido }: { lleno: boolean; maxArchivos: 
                 onChange={(e) => setCuando(e.target.value)}
               />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="bib-archivo">
+                Fotos o videos{" "}
+                <span className="font-normal text-muted-foreground">
+                  ({elegidos.length} de {maxPartes})
+                </span>
+              </Label>
+              <Input
+                ref={input}
+                id="bib-archivo"
+                type="file"
+                multiple
+                accept={ACEPTA}
+                disabled={elegidos.length >= maxPartes}
+                onChange={(e) => void agregar(e.target.files)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Puedes elegir varias a la vez (mantén Ctrl o toca varias en el celular) o agregarlas de una en una.
+              </p>
+              {elegidos.length > 0 && (
+                <>
+                  <ul className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+                    {elegidos.map((e, i) => {
+                      const Icono = e.file.type.startsWith("video") ? Video : FileText;
+                      return (
+                        <li key={`${e.file.name}-${i}`} className="relative">
+                          {e.url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={e.url} alt={e.file.name} className="h-20 w-full rounded-md bg-muted object-cover" />
+                          ) : (
+                            <div className="flex h-20 w-full flex-col items-center justify-center gap-1 rounded-md bg-muted px-1 text-center text-[10px] text-muted-foreground">
+                              <Icono className="h-5 w-5" />
+                              <span className="line-clamp-2 break-all">{e.file.name}</span>
+                            </div>
+                          )}
+                          {i === 0 && (
+                            <span className="absolute left-1 top-1 rounded bg-background/90 px-1 text-[10px] font-medium">
+                              Principal
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            aria-label={`Quitar ${e.file.name}`}
+                            className="absolute right-1 top-1 rounded-full bg-background/90 p-0.5 text-muted-foreground hover:text-foreground"
+                            onClick={() => quitar(i)}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <p className={cn("text-xs", problemaLote ? "text-danger-text" : "text-muted-foreground")}>
+                    {problemaLote ?? `${elegidos.length} ${elegidos.length === 1 ? "archivo" : "archivos"} · ${pesoLegible(pesoTotal)}`}
+                  </p>
+                </>
+              )}
+            </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Button onClick={() => void subir()} disabled={subiendo || !archivo}>
+              <Button
+                onClick={() => void subir()}
+                disabled={subiendo || elegidos.length === 0 || !titulo.trim() || Boolean(problemaLote)}
+              >
                 <Upload className="mr-2 h-4 w-4" />
-                {subiendo ? "Subiendo…" : "Subir"}
+                {subiendo
+                  ? "Subiendo…"
+                  : elegidos.length > 1
+                    ? `Subir ${elegidos.length} archivos`
+                    : "Subir"}
               </Button>
               {error && <span className="text-sm text-danger-text">{error}</span>}
               {listo && !error && <span className="text-sm text-success-text">Listo: ya está en la biblioteca.</span>}
@@ -222,12 +444,52 @@ function Subir({ lleno, maxArchivos, onSubido }: { lleno: boolean; maxArchivos: 
 }
 
 function Vista({ archivo }: { archivo: ArchivoDto }) {
-  const url = `/api/settings/biblioteca/${archivo.id}/archivo`;
-  if (archivo.tipo === "foto") {
+  const [n, setN] = useState(0);
+  const partes = archivo.partes ?? [{ n: 0, tipo: archivo.tipo, tamano: archivo.tamano }];
+  const actual = partes[n] ?? partes[0]!;
+  if (partes.length <= 1) return <VistaParte archivo={archivo} n={0} tipo={archivo.tipo} />;
+  return (
+    <div className="space-y-2">
+      <VistaParte archivo={archivo} n={actual.n} tipo={actual.tipo} />
+      <div className="flex gap-1.5 overflow-x-auto pb-1">
+        {partes.map((p) => (
+          <button
+            key={p.n}
+            type="button"
+            aria-label={`Ver archivo ${p.n + 1} de ${partes.length}`}
+            className={cn(
+              "h-12 w-12 shrink-0 overflow-hidden rounded border-2",
+              p.n === actual.n ? "border-brand" : "border-transparent opacity-70 hover:opacity-100"
+            )}
+            onClick={() => setN(p.n)}
+          >
+            {p.tipo === "foto" ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/settings/biblioteca/${archivo.id}/archivo?n=${p.n}`}
+                alt=""
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
+            ) : (
+              <span className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">
+                {p.tipo === "video" ? <Video className="h-4 w-4" /> : <FileText className="h-4 w-4" />}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function VistaParte({ archivo, n, tipo }: { archivo: ArchivoDto; n: number; tipo: ArchivoDto["tipo"] }) {
+  const url = `/api/settings/biblioteca/${archivo.id}/archivo${n > 0 ? `?n=${n}` : ""}`;
+  if (tipo === "foto") {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={url} alt={archivo.titulo} className="h-44 w-full rounded-md bg-muted object-cover" loading="lazy" />;
   }
-  if (archivo.tipo === "video") {
+  if (tipo === "video") {
     return <video src={url} controls preload="metadata" className="h-44 w-full rounded-md bg-black object-contain" />;
   }
   return (
@@ -246,11 +508,13 @@ function Vista({ archivo }: { archivo: ArchivoDto }) {
 function Tarjeta({
   archivo,
   editable,
+  productos,
   onCambio,
   onAviso,
 }: {
   archivo: ArchivoDto;
   editable: boolean;
+  productos: string[];
   onCambio: () => void;
   onAviso: (a: Aviso) => void;
 }) {
@@ -294,11 +558,11 @@ function Tarjeta({
         <Vista archivo={archivo} />
         {editando ? (
           <div className="space-y-2">
-            <Input
+            <TituloConProductos
               value={titulo}
-              maxLength={MAX_TITULO}
-              aria-label="Título"
-              onChange={(e) => setTitulo(e.target.value)}
+              productos={productos}
+              onChange={setTitulo}
+              onElegir={(p) => setTitulo(p.slice(0, MAX_TITULO))}
             />
             <Textarea
               rows={2}
@@ -343,7 +607,9 @@ function Tarjeta({
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-          <Badge variant="secondary">{NOMBRE_TIPO[archivo.tipo]}</Badge>
+          <Badge variant="secondary">
+            {(archivo.cantidad ?? 1) > 1 ? `${archivo.cantidad} archivos` : NOMBRE_TIPO[archivo.tipo]}
+          </Badge>
           <span>{pesoLegible(archivo.tamano)}</span>
           <span>·</span>
           <span>
