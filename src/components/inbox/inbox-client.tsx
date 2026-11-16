@@ -491,7 +491,7 @@ export function InboxClient({
       >
         {selected ? (
           <>
-            <header className="flex items-center justify-between gap-1 border-b bg-background px-2 py-2.5 md:px-4 lg:tarjeta lg:border-b-0 lg:px-5 lg:py-3">
+            <header className="flex flex-wrap items-center justify-between gap-1 border-b bg-background px-2 py-2.5 md:px-4 lg:tarjeta lg:border-b-0 lg:px-5 lg:py-3">
               {/* Volver a la lista: en móvil el hilo ocupa toda la pantalla. */}
               <button
                 onClick={() => setSelectedId(null)}
@@ -510,33 +510,6 @@ export function InboxClient({
                   <p className="flex min-w-0 items-center gap-1.5 text-[15px] font-bold leading-tight tracking-tight lg:text-[18px] lg:font-semibold">
                     {multiChannel && <ChannelBadge channel={selected.channel} />}
                     <span className="truncate">{selected.contact.name}</span>
-                    {/* Módulo de la agencia: la IA de esta conversación, a la mano. */}
-                    <IaRapida
-                      conversation={selected}
-                      onPatchConversation={cambiarIa}
-                    />
-                    {cotizaciones && (
-                      <Cotizar
-                        conversation={selected}
-                        onDone={() => {
-                          if (selectedIdRef.current)
-                            void refetchMessages(selectedIdRef.current);
-                          void refetchConversations();
-                        }}
-                      />
-                    )}
-                    {pedidos && <PedidoPill conversation={selected} puedeBorrar={canDelete} />}
-                    {seguimiento && <SeguimientoPill conversation={selected} />}
-                    {agenda && (
-                      <AgendarCita
-                        conversation={selected}
-                        onDone={() => {
-                          if (selectedIdRef.current)
-                            void refetchMessages(selectedIdRef.current);
-                          void refetchConversations();
-                        }}
-                      />
-                    )}
                   </p>
                   <p
                     className={cn(
@@ -572,6 +545,41 @@ export function InboxClient({
                   <PanelRight className="h-4 w-4" strokeWidth={1.7} />
                 </button>
               )}
+              {/* Módulo de la agencia: las acciones del hilo en su propio renglón,
+                  con su nombre: así el nombre del cliente se ve completo (antes,
+                  con 5 botones junto al nombre, en celular solo se veía «S.»). */}
+              <div
+                className="-mx-1 flex basis-full items-center gap-1.5 overflow-x-auto px-1 pb-0.5 pt-1 [scrollbar-width:none]"
+                data-acciones-hilo
+              >
+                {/* La IA de esta conversación, a la mano. */}
+                <IaRapida
+                  conversation={selected}
+                  onPatchConversation={cambiarIa}
+                />
+                {cotizaciones && (
+                  <Cotizar
+                    conversation={selected}
+                    onDone={() => {
+                      if (selectedIdRef.current)
+                        void refetchMessages(selectedIdRef.current);
+                      void refetchConversations();
+                    }}
+                  />
+                )}
+                {pedidos && <PedidoPill conversation={selected} puedeBorrar={canDelete} />}
+                {seguimiento && <SeguimientoPill conversation={selected} />}
+                {agenda && (
+                  <AgendarCita
+                    conversation={selected}
+                    onDone={() => {
+                      if (selectedIdRef.current)
+                        void refetchMessages(selectedIdRef.current);
+                      void refetchConversations();
+                    }}
+                  />
+                )}
+              </div>
             </header>
             {/* Módulo de la agencia: el resumen para quien atiende (RESUMEN_TRASPASO). */}
             <ResumenTraspaso conversation={selected} />

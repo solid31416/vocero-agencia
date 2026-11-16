@@ -63,7 +63,7 @@ export function PedidoPill({ conversation, puedeBorrar }: { conversation: Conver
         )}
       >
         <Package className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
-        <span className="max-w-[9rem] truncate max-sm:sr-only">
+        <span className="max-w-[9rem] truncate">
           {porCobrar ? "Cobrar saldo" : ultimo ? ultimo.etapaNombre : "Pedido"}
         </span>
       </button>

@@ -274,7 +274,8 @@ export function etapaDeAnticipo<T extends { name: string; kind: string }>(etapas
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
-  return etapas.find((e) => e.kind === "open" && norm(e.name).includes("anticipo")) ?? null;
+  // Abierta o de «ganado»: en Wis Dome «Anticipo pagado» ES la etapa ganada.
+  return etapas.find((e) => (e.kind === "open" || e.kind === "won") && norm(e.name).includes("anticipo")) ?? null;
 }
 
 export type AvisoHistorial = "texto" | "plantilla" | "no" | "fallo";

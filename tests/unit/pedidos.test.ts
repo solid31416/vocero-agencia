@@ -145,6 +145,15 @@ describe("pedidos — menú y bandera", () => {
     expect(ajustes(true)).toContain("/settings/pedidos");
   });
 
+  it("«Cotizaciones» en el menú principal solo con su bandera, antes de Pedidos", () => {
+    const menu = (c: boolean) =>
+      appNavGroups({ pedidos: true, cotizaciones: c }).flatMap((g) => g.items.map((i) => i.href));
+    expect(menu(false)).not.toContain("/cotizaciones");
+    const conCot = menu(true);
+    expect(conCot.indexOf("/cotizaciones")).toBeGreaterThan(-1);
+    expect(conCot.indexOf("/cotizaciones")).toBeLessThan(conCot.indexOf("/pedidos"));
+  });
+
   it("apagada por defecto, encendida con on", () => {
     delete process.env.PEDIDOS;
     expect(pedidosEnabled()).toBe(false);

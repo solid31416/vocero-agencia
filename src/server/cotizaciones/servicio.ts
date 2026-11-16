@@ -17,6 +17,7 @@ import { getBranding } from "@/server/branding";
 import { SendError, sendMediaMessage } from "@/server/inbox/send";
 import { generarPdfCotizacion, nombreArchivo } from "./pdf";
 import { leerConfig, leerCotizacion, leerLogo, marcarEnviada } from "./store";
+import { montoAlTrato } from "./embudo";
 
 type Fila = NonNullable<Awaited<ReturnType<typeof leerCotizacion>>>;
 
@@ -96,6 +97,15 @@ export async function enviarCotizacion(organizationId: string, id: string): Prom
     await marcarEnviada(organizationId, id, {
       messageId: r.messageId,
       vigenciaDias: fila.condiciones.vigenciaDias,
+    });
+    // El trato toma el total como monto si nadie le había puesto uno.
+    await montoAlTrato({
+      organizationId,
+      contactId: fila.contactId,
+      conversationId: fila.conversationId,
+      total: fila.totales.total,
+      moneda: fila.condiciones.moneda ?? "MXN",
+      soloSiVacio: true,
     });
     return { ok: true, messageId: r.messageId };
   } catch (err) {

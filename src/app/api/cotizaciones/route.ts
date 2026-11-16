@@ -15,11 +15,14 @@ export const dynamic = "force-dynamic";
 /** Las cotizaciones de una conversación (o las últimas), y la lista de productos para armar una. */
 export const GET = withAuth(async (session, req: Request) => {
   if (!cotizacionesEnabled()) return new Response(null, { status: 404 });
-  const conversationId = new URL(req.url).searchParams.get("conversationId") ?? undefined;
+  const params = new URL(req.url).searchParams;
+  const conversationId = params.get("conversationId") ?? undefined;
+  // La pantalla «Cotizaciones» pide más que las 20 de una conversación.
+  const limite = conversationId ? 20 : Math.min(200, Math.max(1, Number(params.get("limite")) || 20));
   const org = session.organizationId;
   const conPedidos = pedidosEnabled();
   const [cotizaciones, config, pedidos] = await Promise.all([
-    listarCotizaciones(org, { conversationId, limite: 20 }),
+    listarCotizaciones(org, { conversationId, limite }),
     leerConfig(org),
     conPedidos ? listarPedidos(org, { conversationId }) : Promise.resolve([]),
   ]);

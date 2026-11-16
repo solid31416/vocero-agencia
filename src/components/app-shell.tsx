@@ -32,6 +32,7 @@ export function AppShell({
   commit,
   agenda = false,
   pedidos = false,
+  cotizaciones = false,
   kicker,
   aviso = null,
   children,
@@ -46,6 +47,8 @@ export function AppShell({
   agenda?: boolean;
   /** Módulo de la agencia: «Pedidos» en el menú (bandera PEDIDOS). */
   pedidos?: boolean;
+  /** Módulo de la agencia: «Cotizaciones» en el menú (bandera COTIZACIONES). */
+  cotizaciones?: boolean;
   /** 028 — La etiqueta bajo el logo (`navKicker`). */
   kicker?: string;
   /**
@@ -99,6 +102,7 @@ export function AppShell({
         apariencia={apariencia}
         agenda={agenda}
         pedidos={pedidos}
+        cotizaciones={cotizaciones}
         kicker={kicker}
         open={navOpen}
         onClose={() => setNavOpen(false)}
@@ -121,7 +125,7 @@ export function AppShell({
         {/* 056 — El tiempo real caído se ve desde cualquier pantalla. */}
         <BandaSinConexion />
         {/* 055 — Ctrl+K y «?» desde cualquier pantalla. */}
-        <AtajosGlobales agenda={agenda} pedidos={pedidos} role={role} />
+        <AtajosGlobales agenda={agenda} pedidos={pedidos} cotizaciones={cotizaciones} role={role} />
 
         {/* La Bandeja trae sus propias tarjetas (lista, hilo, panel); el resto
             de las pantallas vive en una sola. */}

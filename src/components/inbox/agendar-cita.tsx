@@ -59,7 +59,7 @@ export function AgendarCita({
         )}
       >
         <CalendarPlus className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
-        <span className="max-sm:sr-only">Agendar</span>
+        <span>Agendar</span>
       </button>
       {abierto && (
         <VentanaAgendar

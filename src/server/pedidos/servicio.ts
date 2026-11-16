@@ -293,7 +293,9 @@ export async function registrarPago(
   const config = await leerConfig(organizationId);
   await anotarEnFicha(organizationId, config, final);
 
-  const etapaEmbudo = previos.length === 0 && final.contactId ? await moverAAnticipo(organizationId, final.contactId, userId) : null;
+  // Cualquier pago (no solo el primero) lleva al cliente a «Anticipo…» si todavía no llega:
+  // así se acomodan también los pedidos que ya tenían pagos antes de este cambio.
+  const etapaEmbudo = final.contactId ? await moverAAnticipo(organizationId, final.contactId, userId) : null;
 
   let aviso: ResultadoPago["aviso"] = null;
   if (datos.avisar) {

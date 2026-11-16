@@ -108,7 +108,7 @@ export function Cotizar({ conversation, onDone }: { conversation: ConversationDt
         ) : (
           <FileText className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
         )}
-        <span className="max-sm:sr-only">{senal ? "¿Aceptó?" : "Cotizar"}</span>
+        <span>{senal ? "¿Aceptó?" : "Cotizar"}</span>
       </button>
       {abierto && (
         <VentanaCotizar

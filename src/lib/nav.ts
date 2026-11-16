@@ -1,6 +1,7 @@
 import {
   CalendarDays,
   ChartColumn,
+  FileText,
   FlaskConical,
   Inbox,
   Kanban,
@@ -51,10 +52,13 @@ export const SETTINGS_ITEM: NavItem = {
 export function appNavGroups({
   agenda = false,
   pedidos = false,
+  cotizaciones = false,
   role,
 }: {
   /** Módulo de la agencia: «Pedidos» solo con la bandera PEDIDOS. */
   pedidos?: boolean;
+  /** Módulo de la agencia: «Cotizaciones» solo con la bandera COTIZACIONES. */
+  cotizaciones?: boolean;
   /** 015 — "Citas" solo existe si esta instancia encendió la agenda. */
   agenda?: boolean;
   /** #86 — La guía de inicio solo para quien puede configurar. */
@@ -68,6 +72,8 @@ export function appNavGroups({
   // Citas va después de Contactos: es el paso siguiente de un trato, no una
   // sección aparte.
   if (agenda) trabajo.push({ href: "/bookings", label: "Citas", icon: CalendarDays });
+  // Cotizaciones antes que Pedidos: es el orden de la venta.
+  if (cotizaciones) trabajo.push({ href: "/cotizaciones", label: "Cotizaciones", icon: FileText });
   if (pedidos) trabajo.push({ href: "/pedidos", label: "Pedidos", icon: Package });
 
   const agente: NavItem[] = [];
