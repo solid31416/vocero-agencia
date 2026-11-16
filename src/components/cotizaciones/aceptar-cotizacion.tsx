@@ -5,7 +5,8 @@ import { Check, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { sePuedeAceptar, type CotizacionDto } from "@/lib/cotizaciones";
+import { NumeroInput } from "@/components/ui/numero-input";
+import { conceptoDeCotizacion, formatoDinero, sePuedeAceptar, type CotizacionDto } from "@/lib/cotizaciones";
 import type { PedidoDto } from "@/lib/pedidos";
 
 /**
@@ -63,6 +64,9 @@ export function AceptarCotizacion({
   const [crear, setCrear] = useState(true);
   const [avisar, setAvisar] = useState(true);
   const [fecha, setFecha] = useState("");
+  // Lo que dirá el pedido: sale de la cotización y se puede corregir antes de confirmar.
+  const [concepto, setConcepto] = useState(() => conceptoDeCotizacion(cotizacion.partidas));
+  const [monto, setMonto] = useState<number | null>(cotizacion.totales.total);
   const [ocupado, setOcupado] = useState(false);
 
   if (pedidoFolio) {
@@ -78,11 +82,14 @@ export function AceptarCotizacion({
   if (!aceptable && !sinPedido) return null;
 
   async function confirmar() {
+    const conPedido = pedidosActivos && crear;
+    if (conPedido && !concepto.trim()) return onListo("Escribe qué se pidió", false);
     setOcupado(true);
     const r = await pedirAceptar(cotizacion.id, {
-      crearPedido: pedidosActivos && crear,
+      crearPedido: conPedido,
       avisar,
       fechaEstimada: fecha || null,
+      ...(conPedido ? { concepto: concepto.trim(), monto } : {}),
     });
     setOcupado(false);
     if (!r.ok) return onListo(r.error, false);
@@ -107,10 +114,11 @@ export function AceptarCotizacion({
   }
 
   return (
-    <div className="w-full space-y-2 rounded-md border border-dashed p-2 text-sm">
+    <div className="w-full space-y-2 rounded-md border border-dashed p-2 text-left text-sm">
       {aceptable && (
         <p className="text-text-2">
-          El cliente aceptó la <strong>{cotizacion.folio}</strong>.
+          El cliente aceptó la <strong>{cotizacion.folio}</strong> por{" "}
+          <strong>{formatoDinero(cotizacion.totales.total, cotizacion.moneda)}</strong>.
         </p>
       )}
       {pedidosActivos && (
@@ -123,6 +131,30 @@ export function AceptarCotizacion({
           )}
           {(crear || !aceptable) && (
             <>
+              <div className="space-y-1">
+                <Label htmlFor={`concepto-${cotizacion.id}`} className="text-xs font-normal text-text-2">
+                  ¿Qué se pidió? (así sale en el pedido; corrígelo si cambió algo)
+                </Label>
+                <Input
+                  id={`concepto-${cotizacion.id}`}
+                  value={concepto}
+                  maxLength={300}
+                  onChange={(e) => setConcepto(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Label htmlFor={`monto-${cotizacion.id}`} className="text-xs font-normal text-text-2">
+                  Monto del pedido
+                </Label>
+                <NumeroInput
+                  id={`monto-${cotizacion.id}`}
+                  min={0}
+                  step="any"
+                  value={monto ?? 0}
+                  onValueChange={(n) => setMonto(Number.isFinite(n) ? n : null)}
+                  className="h-8 w-40"
+                />
+              </div>
               <label className="flex items-center gap-2">
                 <input type="checkbox" checked={avisar} onChange={(e) => setAvisar(e.target.checked)} />
                 Avisarle que su pedido quedó confirmado
