@@ -48,6 +48,29 @@ export function limpiarTexto(s: string): string {
   return out.replace(/[ ]{2,}/g, " ");
 }
 
+/** Respaldo cuando el color de la marca no se lee en papel blanco. */
+const ACENTO_OSCURO = "#1f2937";
+
+/**
+ * El acento con el que se imprime la cotización. El total va en letra blanca
+ * sobre una barra del acento, y el título y los encabezados en el acento
+ * sobre papel blanco: con una marca blanca o muy clara (la de Wis Dome es
+ * #ffffff) el total desaparecía. Si el acento no contrasta al menos 3:1 con
+ * el blanco, se usa un gris oscuro.
+ */
+export function acentoParaPapel(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return "#0d5bff";
+  const n = parseInt(m[1]!, 16);
+  const canal = (v: number) => {
+    const c = v / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const luz = 0.2126 * canal((n >> 16) & 255) + 0.7152 * canal((n >> 8) & 255) + 0.0722 * canal(n & 255);
+  const contraste = 1.05 / (luz + 0.05);
+  return contraste >= 3 ? `#${m[1]!.toLowerCase()}` : ACENTO_OSCURO;
+}
+
 function hexARgb(hex: string) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
   const n = m ? parseInt(m[1]!, 16) : 0x0d5bff;
@@ -89,7 +112,7 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
   pdf.setCreator("Vocero CRM");
   const normal = await pdf.embedFont(StandardFonts.Helvetica);
   const negrita = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const acento = hexARgb(d.acento);
+  const acento = hexARgb(acentoParaPapel(d.acento));
   const gris = rgb(0.42, 0.43, 0.47);
   const tinta = rgb(0.1, 0.11, 0.13);
   const linea = rgb(0.86, 0.87, 0.89);

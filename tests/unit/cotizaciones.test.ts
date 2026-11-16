@@ -17,7 +17,7 @@ import {
   type Producto,
 } from "@/lib/cotizaciones";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
-import { generarPdfCotizacion, limpiarTexto, nombreArchivo } from "@/server/cotizaciones/pdf";
+import { acentoParaPapel, generarPdfCotizacion, limpiarTexto, nombreArchivo } from "@/server/cotizaciones/pdf";
 
 const productos: Producto[] = [
   { id: "p1", nombre: "Domo Estándar", precio: 100000, unidad: "pieza", descripcion: "Expansión en dos direcciones" },
@@ -263,5 +263,19 @@ describe("cotización aceptada → pedido", () => {
     expect(sePuedeAceptar("borrador")).toBe(false);
     expect(sePuedeAceptar("rechazada")).toBe(false);
     expect(sePuedeAceptar("aceptada")).toBe(false);
+  });
+});
+
+describe("el PDF se lee con cualquier color de marca", () => {
+  it("una marca blanca o muy clara se imprime en gris oscuro", () => {
+    expect(acentoParaPapel("#ffffff")).toBe("#1f2937");
+    expect(acentoParaPapel("#e9e9e9")).toBe("#1f2937");
+    expect(acentoParaPapel("#facc15")).toBe("#1f2937");
+  });
+
+  it("una marca con buen contraste se respeta", () => {
+    expect(acentoParaPapel("#0D5BFF")).toBe("#0d5bff");
+    expect(acentoParaPapel("#616161")).toBe("#616161");
+    expect(acentoParaPapel("raro")).toBe("#0d5bff");
   });
 });
