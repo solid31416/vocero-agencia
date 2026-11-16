@@ -47,6 +47,29 @@ export const negocioSchema = z.object({
 export const MENSAJE_POR_DEFECTO =
   "Hola {nombre}, te comparto tu cotización {folio} por {total}. Es válida hasta el {vigencia}. Cualquier duda, aquí estamos.";
 
+/* ------------------------------------------------------------------
+ * Seguimiento a cotizaciones sin respuesta (2026-11-16)
+ * ------------------------------------------------------------------ */
+
+export const TEXTO_SEGUIMIENTO_POR_DEFECTO =
+  "Hola {nombre}, ¿pudiste revisar la cotización de {producto} que te mandé? Si quieres la ajustamos o te resuelvo cualquier duda por aquí.";
+
+/** Texto sugerido para dar de alta la plantilla (Marketing): {{1}} nombre, {{2}} producto. */
+export const PLANTILLA_SEGUIMIENTO_SUGERIDA =
+  "Hola {{1}}, ¿pudiste revisar la cotización de {{2}} que te enviamos? Si quieres la ajustamos o resolvemos tus dudas por aquí.";
+
+export const seguimientoCotSchema = z.object({
+  activo: z.boolean().default(false),
+  /** Recordatorio con texto normal antes de que se cierre la ventana de 24 h (gratis, sin plantilla). */
+  conTexto: z.boolean().default(true),
+  texto: z.string().trim().min(1).max(600).default(TEXTO_SEGUIMIENTO_POR_DEFECTO),
+  /** Recordatorio con plantilla a los N días de enviada. */
+  dias: z.coerce.number().int().min(1).max(30).default(3),
+  plantillaId: z.string().trim().max(60).nullable().default(null),
+});
+export type SeguimientoCot = z.infer<typeof seguimientoCotSchema>;
+export const SEGUIMIENTO_COT_POR_DEFECTO: SeguimientoCot = seguimientoCotSchema.parse({});
+
 export const configSchema = z.object({
   negocio: negocioSchema.default({ nombre: "", rfc: "", direccion: "", telefono: "", correo: "" }),
   productos: z.array(productoSchema).max(MAX_PRODUCTOS, `Máximo ${MAX_PRODUCTOS} productos`).default([]),
@@ -60,6 +83,9 @@ export const configSchema = z.object({
   /** El texto que acompaña al PDF en WhatsApp. {nombre} {folio} {total} {vigencia}. */
   mensaje: z.string().trim().min(1).max(600).default(MENSAJE_POR_DEFECTO),
   moneda: z.enum(["MXN", "USD"]).default("MXN"),
+  seguimiento: seguimientoCotSchema.default(SEGUIMIENTO_COT_POR_DEFECTO),
+  /** Avisar cuando el cliente parece decir que sí a una cotización enviada. */
+  detectarSi: z.boolean().default(true),
 });
 export type ConfigCotizaciones = z.infer<typeof configSchema>;
 export const CONFIG_POR_DEFECTO: ConfigCotizaciones = configSchema.parse({});
@@ -205,7 +231,169 @@ export type CotizacionDto = {
   venceEn: string | null;
   enviadaEn: string | null;
   createdAt: string;
+  /** Seguimiento detenido para esta cotización. */
+  seguimientoPausado: boolean;
+  /** El cliente parece haber dicho que sí: lo que escribió y cuándo. */
+  senal: { texto: string; en: string } | null;
 };
+
+/** Cómo va el seguimiento de una cotización enviada (para la tarjeta de la bandeja). */
+export type SeguimientoCotDto = {
+  /** Lo que ya salió. */
+  toques: { toque: Toque; estado: "enviado" | "omitido" | "fallido"; detalle: string | null; en: string }[];
+  /** El que sigue, si hay. */
+  siguiente: { toque: Toque; fecha: string } | null;
+  /** Por qué no corre (null = corre o ya terminó). */
+  motivo: string | null;
+};
+
+export type Toque = "texto" | "plantilla";
+
+const HORA_MS = 3_600_000;
+const DIA_MS = 24 * HORA_MS;
+export const VENTANA_MS = DIA_MS;
+/** El recordatorio de texto sale cuando faltan 2 h para que se cierre la ventana… */
+export const TEXTO_ANTES_DE_CERRAR_MS = 2 * HORA_MS;
+/** …pero nunca antes de 3 h de enviada la cotización. */
+export const MIN_TRAS_ENVIO_MS = 3 * HORA_MS;
+/** Margen final: con menos de 5 minutos de ventana ya no se arriesga. */
+const MARGEN_CIERRE_MS = 5 * 60_000;
+/** Un recordatorio con plantilla que se pasó más de esto (revisor apagado) ya no sale. */
+export const GRACIA_PLANTILLA_MS = 48 * HORA_MS;
+/** Entre el recordatorio de texto y el de plantilla, al menos esto. */
+export const ENTRE_TOQUES_MS = 20 * HORA_MS;
+
+type EntradaToque = {
+  ahora: Date;
+  enviadaEn: Date;
+  /** Último mensaje del cliente (cualquiera). */
+  ultimoDelCliente: Date | null;
+  /** Lo que ya salió para esta cotización, con su fecha. */
+  hechos: readonly { toque: Toque; en: Date }[];
+  config: SeguimientoCot;
+};
+
+function ventanaDelTexto(e: EntradaToque): { desde: number; hasta: number } | null {
+  if (!e.config.conTexto || !e.ultimoDelCliente) return null;
+  if (e.hechos.some((h) => h.toque === "texto" || h.toque === "plantilla")) return null;
+  const cierra = e.ultimoDelCliente.getTime() + VENTANA_MS;
+  const desde = Math.max(cierra - TEXTO_ANTES_DE_CERRAR_MS, e.enviadaEn.getTime() + MIN_TRAS_ENVIO_MS);
+  const hasta = cierra - MARGEN_CIERRE_MS;
+  return desde < hasta ? { desde, hasta } : null;
+}
+
+function momentoDePlantilla(e: EntradaToque): { desde: number; hasta: number } | null {
+  if (!e.config.plantillaId) return null;
+  if (e.hechos.some((h) => h.toque === "plantilla")) return null;
+  let desde = e.enviadaEn.getTime() + e.config.dias * DIA_MS;
+  const texto = e.hechos.find((h) => h.toque === "texto");
+  if (texto) desde = Math.max(desde, texto.en.getTime() + ENTRE_TOQUES_MS);
+  return { desde, hasta: e.enviadaEn.getTime() + e.config.dias * DIA_MS + GRACIA_PLANTILLA_MS };
+}
+
+/** ¿Le toca recordatorio ahora? Si el cliente ya escribió después de la cotización, nunca. */
+export function toqueQueToca(e: EntradaToque): Toque | null {
+  if (!e.config.activo) return null;
+  if (e.ultimoDelCliente && e.ultimoDelCliente.getTime() > e.enviadaEn.getTime()) return null;
+  const t = e.ahora.getTime();
+  const tx = ventanaDelTexto(e);
+  if (tx && t >= tx.desde && t < tx.hasta) return "texto";
+  const pl = momentoDePlantilla(e);
+  if (pl && t >= pl.desde && t < pl.hasta) return "plantilla";
+  return null;
+}
+
+/** El recordatorio que sigue y cuándo sale (para enseñarlo), o null. */
+export function siguienteToque(e: EntradaToque): { toque: Toque; fecha: Date } | null {
+  if (!e.config.activo) return null;
+  if (e.ultimoDelCliente && e.ultimoDelCliente.getTime() > e.enviadaEn.getTime()) return null;
+  const t = e.ahora.getTime();
+  const tx = ventanaDelTexto(e);
+  if (tx && t < tx.hasta) return { toque: "texto", fecha: new Date(Math.max(tx.desde, t)) };
+  const pl = momentoDePlantilla(e);
+  if (pl && t < pl.hasta) return { toque: "plantilla", fecha: new Date(Math.max(pl.desde, t)) };
+  return null;
+}
+
+/** El producto principal de la cotización (la partida de más valor) para el recordatorio. */
+export function productoPrincipal(partidas: readonly Pick<Partida, "concepto" | "cantidad" | "precio">[]): string {
+  const conNombre = partidas.filter((p) => p.concepto.trim());
+  if (conNombre.length === 0) return "tu proyecto";
+  const mayor = [...conNombre].sort((a, b) => b.cantidad * b.precio - a.cantidad * a.precio)[0]!;
+  return mayor.concepto.trim().slice(0, 80);
+}
+
+/** El texto del recordatorio con {nombre} {producto} {folio} llenos. */
+export function textoDeSeguimiento(plantilla: string, datos: { nombre: string; producto: string; folio: string }): string {
+  const primerNombre = datos.nombre.trim().split(/\s+/)[0] ?? "";
+  return plantilla
+    .replaceAll("{nombre}", primerNombre)
+    .replaceAll("{producto}", datos.producto)
+    .replaceAll("{folio}", datos.folio)
+    .replace(/\s+,/g, ",")
+    .replace(/Hola ,/g, "Hola,")
+    .trim();
+}
+
+/* ------------------------------------------------------------------
+ * El cliente dice que sí (2026-11-16)
+ * ------------------------------------------------------------------ */
+
+/** Frases que casi siempre son un «sí» (o preguntar cómo pagar). */
+const FUERTES: readonly RegExp[] = [
+  /\b(a|en) (que|cual) cuenta\b/,
+  /\bclabe\b/,
+  /\bnumero de cuenta\b/,
+  /\bdatos (bancarios|de (la )?cuenta|para (el )?(pago|deposito|transferencia))\b/,
+  /\b(lo|la|los|las) quiero\b/,
+  /\bme (lo|la|los|las) llevo\b/,
+  /\b(acepto|aceptamos|aceptada)\b/,
+  /\b(como|donde) (te |le |les )?(pago|deposito|transfiero|hago el (pago|deposito))\b/,
+  /\b(ya )?(te |le |les )?(deposite|transferi|pague|hice el (deposito|pago)|mande el comprobante)\b/,
+  /\b(cerramos|trato hecho|vamos con (ese|esa|el|la))\b/,
+  /\b(apartar|aparto|apartamelo|apartalo|apartala)\b/,
+  /\b(quiero|vamos a|voy a) (dar|pagar|hacer) el anticipo\b/,
+];
+
+/** Pistas que podrían ser un «sí»: solo cuentan si la IA lo confirma. */
+const DEBILES: readonly RegExp[] = [
+  /\b(va|sale|ok|okay|listo|perfecto|adelante|de acuerdo|me interesa|me convence|me gusta)\b/,
+  /\b(si|sii+)\b/,
+  /\b(anticipo|pago|pagar|deposito|depositar|transferencia|transferir)\b/,
+  /\bquiero\b/,
+  /\b(cuando|cuanto tarda|en cuanto tiempo) (me )?(lo |la )?(entregan|instalan|llega)\b/,
+];
+
+const NEGACIONES: readonly RegExp[] = [
+  /\bno (lo|la|los|las) quiero\b/,
+  /\bno me (interesa|convence)\b/,
+  /\b(todavia|aun) no\b/,
+  /\b(muy caro|esta caro|lo voy a pensar|lo pienso|dejame pensarlo)\b/,
+];
+
+/** Primer filtro, sin IA: ¿lo que escribió el cliente huele a «sí»? */
+export function pistaDeAceptacion(texto: string): "fuerte" | "debil" | null {
+  const t = normalizar(texto);
+  if (!t) return null;
+  if (NEGACIONES.some((r) => r.test(t))) return null;
+  if (FUERTES.some((r) => r.test(t))) return "fuerte";
+  if (DEBILES.some((r) => r.test(t))) return "debil";
+  return null;
+}
+
+export const respuestaAceptacionSchema = z.object({
+  acepta: z.boolean(),
+  frase: z.string().max(300).default(""),
+});
+
+export const PROMPT_ACEPTACION = [
+  "Eres analista de ventas. Un negocio le mandó una cotización a un cliente por WhatsApp.",
+  "Lee los mensajes que el cliente escribió DESPUÉS de recibirla y decide si ACEPTA la cotización:",
+  "dice que sí la quiere, pregunta a qué cuenta depositar o cómo pagar el anticipo, dice que ya pagó,",
+  "o pide apartar. NO cuenta como aceptar: hacer preguntas sobre el producto, pedir descuento o",
+  "cambios, decir que lo va a pensar, o un «ok» que solo confirma que recibió el PDF.",
+  'Responde SOLO JSON: {"acepta": true|false, "frase": "<el mensaje del cliente que lo demuestra, tal cual, o vacío>"}',
+].join("\n");
 
 /** Lo que la IA propone a partir de la plática: solo productos y cantidades. */
 /**

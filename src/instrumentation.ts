@@ -35,5 +35,8 @@ export async function register(): Promise<void> {
     // Módulo de la agencia: seguimiento automático 3/7/30 días (SEGUIMIENTO_AUTOMATICO).
     const { iniciarSeguimiento } = await import("./server/seguimiento/worker");
     iniciarSeguimiento();
+    // Módulo de la agencia: cotizaciones — el «sí» del cliente y el seguimiento sin respuesta (COTIZACIONES).
+    const { iniciarRevisorCotizaciones } = await import("./server/cotizaciones/revisor");
+    iniciarRevisorCotizaciones();
   }
 }

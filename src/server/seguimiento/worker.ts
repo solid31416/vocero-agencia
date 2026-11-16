@@ -13,6 +13,7 @@ import {
   type Paso,
 } from "@/lib/seguimiento";
 import { sendTemplate } from "@/server/whatsapp/templates";
+import { cotizacionConSeguimiento } from "@/server/cotizaciones/revisor";
 import { seguimientoEnabled } from "./flag";
 import {
   apartarEnvio,
@@ -203,6 +204,10 @@ export async function evaluar(
     .limit(1);
   if (etapa && etapa.kind !== "open") return res(`Está en «${etapa.nombre}»`);
   if (etapa && config.excluirEtapas.includes(etapa.id)) return res(`La etapa «${etapa.nombre}» no lleva seguimiento`);
+
+  // Una cotización enviada lleva su propio recordatorio: no le llegan dos seguidos.
+  const folio = await cotizacionConSeguimiento(organizationId, conversationId);
+  if (folio) return res(`La cotización ${folio} lleva su propio seguimiento`);
 
   return res(null);
 }

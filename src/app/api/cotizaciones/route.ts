@@ -8,6 +8,7 @@ import { listarPedidos } from "@/server/pedidos/store";
 import { folioDe } from "@/lib/pedidos";
 import { aNombreDe } from "@/server/nombre-real";
 import { contactoDeConversacion } from "@/server/cotizaciones/store";
+import { seguimientosDeConversacion } from "@/server/cotizaciones/revisor";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,12 @@ export const GET = withAuth(async (session, req: Request) => {
     conPedidos ? listarPedidos(org, { conversationId }) : Promise.resolve([]),
   ]);
   const contacto = conversationId ? await contactoDeConversacion(org, conversationId).catch(() => null) : null;
+  const seguimientos = conversationId
+    ? await seguimientosDeConversacion(org, conversationId).catch((err) => {
+        console.warn("[cotizaciones] no se pudo leer el seguimiento:", err);
+        return {};
+      })
+    : {};
   // Qué cotización ya tiene pedido (para no ofrecer crear otro).
   const pedidoDeCotizacion: Record<string, string> = {};
   for (const p of pedidos) if (p.cotizacionId) pedidoDeCotizacion[p.cotizacionId] ??= folioDe(p.numero);
@@ -31,6 +38,7 @@ export const GET = withAuth(async (session, req: Request) => {
     pedidosActivos: conPedidos,
     aNombreDe: contacto ? aNombreDe(contacto.ficha, contacto.nombre) : null,
     pedidoDeCotizacion,
+    seguimientos,
     productos: config.productos,
     condiciones: {
       ivaPct: config.ivaPct,

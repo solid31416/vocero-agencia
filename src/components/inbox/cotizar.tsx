@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Copy, FileText, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BellRing, Copy, FileText, PartyPopper, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConversationDto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,9 @@ import {
   MAX_PARTIDAS,
   calcularTotales,
   formatoDinero,
+  sePuedeAceptar,
   type CotizacionDto,
+  type SeguimientoCotDto,
   type Partida,
   type Producto,
 } from "@/lib/cotizaciones";
@@ -50,6 +52,8 @@ type Datos = {
   pedidoDeCotizacion?: Record<string, string>;
   /** El nombre (y la empresa) que dio el cliente en la plática, si lo dio. */
   aNombreDe?: string | null;
+  /** Cómo va el seguimiento de cada cotización enviada. */
+  seguimientos?: Record<string, SeguimientoCotDto>;
 };
 
 const partidaVacia = (): Partida => ({
@@ -63,27 +67,59 @@ const partidaVacia = (): Partida => ({
 
 export function Cotizar({ conversation, onDone }: { conversation: ConversationDto; onDone: () => void }) {
   const [abierto, setAbierto] = useState(false);
+  // ¿El cliente parece haber dicho que sí a una cotización? Se revisa al
+  // abrir la conversación y cada vez que llega un mensaje.
+  const [senal, setSenal] = useState<CotizacionDto | null>(null);
+  const [revision, setRevision] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    void (async () => {
+      const res = await fetch(`/api/cotizaciones?conversationId=${encodeURIComponent(conversation.id)}`).catch(
+        () => null
+      );
+      if (!vivo || !res?.ok) return;
+      const d = (await res.json().catch(() => null)) as { cotizaciones?: CotizacionDto[] } | null;
+      if (!vivo) return;
+      setSenal(d?.cotizaciones?.find((c) => c.senal && sePuedeAceptar(c.estado)) ?? null);
+    })();
+    return () => {
+      vivo = false;
+    };
+  }, [conversation.id, conversation.lastMessageAt, revision]);
+
   return (
     <>
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        aria-label="Hacer una cotización para este cliente"
-        title="Hacer una cotización para este cliente"
+        aria-label={senal ? `El cliente parece aceptar la cotización ${senal.folio}` : "Hacer una cotización para este cliente"}
+        title={senal ? `El cliente parece aceptar la cotización ${senal.folio}` : "Hacer una cotización para este cliente"}
         className={cn(
-          "inline-flex shrink-0 items-center gap-1 rounded-full border border-border-strong px-2 py-0.5 text-[11px] font-medium leading-5 text-text-2 transition-colors",
-          "hover:border-text-3 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-5 transition-colors",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          senal
+            ? "border-success-text/40 bg-success-tint text-success-text"
+            : "border-border-strong text-text-2 hover:border-text-3 hover:text-foreground"
         )}
+        data-senal={senal ? senal.folio : undefined}
       >
-        <FileText className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
-        <span className="max-sm:sr-only">Cotizar</span>
+        {senal ? (
+          <PartyPopper className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+        ) : (
+          <FileText className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+        )}
+        <span className="max-sm:sr-only">{senal ? "¿Aceptó?" : "Cotizar"}</span>
       </button>
       {abierto && (
         <VentanaCotizar
           conversation={conversation}
-          onCancel={() => setAbierto(false)}
+          onCancel={() => {
+            setAbierto(false);
+            setRevision((n) => n + 1);
+          }}
           onDone={() => {
             setAbierto(false);
+            setRevision((n) => n + 1);
             onDone();
           }}
         />
@@ -325,6 +361,7 @@ function VentanaCotizar({
                   cotizacion={c}
                   pedidosActivos={Boolean(datos.pedidosActivos)}
                   pedidoFolio={datos.pedidoDeCotizacion?.[c.id] ?? null}
+                  seguimiento={datos.seguimientos?.[c.id] ?? null}
                   onCopiar={() => copiar(c)}
                   onListo={(texto, ok) => {
                     setAviso({ ok, texto });
@@ -584,15 +621,36 @@ function TarjetaCotizacion({
   cotizacion: c,
   pedidosActivos,
   pedidoFolio,
+  seguimiento,
   onCopiar,
   onListo,
 }: {
   cotizacion: CotizacionDto;
   pedidosActivos: boolean;
   pedidoFolio: string | null;
+  seguimiento: SeguimientoCotDto | null;
   onCopiar: () => void;
   onListo: (texto: string, ok: boolean) => void;
 }) {
+  const [ocupado, setOcupado] = useState(false);
+  async function accion(a: "pausar" | "reanudar" | "ahora" | "descartar_senal") {
+    setOcupado(true);
+    const res = await fetch(`/api/cotizaciones/${c.id}/seguimiento`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ accion: a }),
+    }).catch(() => null);
+    setOcupado(false);
+    const d = (await res?.json().catch(() => null)) as { detalle?: string; error?: { message?: string } } | null;
+    if (!res?.ok) return onListo(d?.error?.message ?? "No se pudo", false);
+    const textos = {
+      pausar: `Seguimiento de ${c.folio} detenido.`,
+      reanudar: `Seguimiento de ${c.folio} reanudado.`,
+      ahora: d?.detalle ?? "Recordatorio enviado.",
+      descartar_senal: "Listo: lo ignoramos.",
+    } as const;
+    onListo(textos[a], true);
+  }
   const fecha = new Date(c.enviadaEn ?? c.createdAt).toLocaleDateString("es-MX", {
     day: "numeric",
     month: "short",
@@ -626,6 +684,26 @@ function TarjetaCotizacion({
         </p>
       )}
       {c.notas && <p className="text-xs text-text-2">Notas: {c.notas}</p>}
+      {c.senal && sePuedeAceptar(c.estado) && (
+        <div className="space-y-1 rounded-md border border-success-text/30 bg-success-tint p-2 text-xs" data-senal-cot={c.folio}>
+          <p className="flex items-center gap-1.5 font-semibold text-success-text">
+            <PartyPopper className="h-3.5 w-3.5" aria-hidden /> Parece que el cliente dijo que sí
+          </p>
+          <p className="text-text-2">«{c.senal.texto}»</p>
+          <p className="flex flex-wrap items-center gap-2 text-text-3">
+            Si es así, usa «Marcar aceptada» aquí abajo.
+            <button
+              type="button"
+              disabled={ocupado}
+              onClick={() => void accion("descartar_senal")}
+              className="font-medium text-text-2 underline underline-offset-2 hover:text-foreground"
+            >
+              No era eso
+            </button>
+          </p>
+        </div>
+      )}
+      {seguimiento && <LineaSeguimiento c={c} s={seguimiento} ocupado={ocupado} onAccion={(a) => void accion(a)} />}
       <div className="flex flex-wrap items-center gap-2 border-t pt-2">
         <a
           href={`/api/cotizaciones/${c.id}/pdf`}
@@ -652,5 +730,69 @@ function TarjetaCotizacion({
         </span>
       </div>
     </li>
+  );
+}
+
+function fechaHora(iso: string): string {
+  return new Date(iso).toLocaleString("es-MX", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+}
+
+const NOMBRE_TOQUE = { texto: "con texto", plantilla: "con plantilla" } as const;
+
+/** Seguimiento sin respuesta: qué salió, qué sigue, y detenerlo o mandarlo ya. */
+function LineaSeguimiento({
+  c,
+  s,
+  ocupado,
+  onAccion,
+}: {
+  c: CotizacionDto;
+  s: SeguimientoCotDto;
+  ocupado: boolean;
+  onAccion: (a: "pausar" | "reanudar" | "ahora") => void;
+}) {
+  const enviada = c.estado === "enviada" || c.estado === "vencida";
+  return (
+    <div className="space-y-1 rounded-md bg-subtle p-2 text-xs" data-seguimiento-cot={c.folio}>
+      <p className="flex items-center gap-1.5 font-medium text-text-2">
+        <BellRing className="h-3.5 w-3.5" aria-hidden /> Seguimiento
+      </p>
+      {s.toques.map((t, i) => (
+        <p key={i} className={t.estado === "enviado" ? "text-text-2" : "text-warning-text"}>
+          {t.estado === "enviado" ? "Recordatorio enviado" : "No salió el recordatorio"} {NOMBRE_TOQUE[t.toque]} el{" "}
+          {fechaHora(t.en)}
+          {t.estado !== "enviado" && t.detalle ? `: ${t.detalle}` : ""}
+        </p>
+      ))}
+      {s.siguiente ? (
+        <p className="text-text-2">
+          Siguiente recordatorio {NOMBRE_TOQUE[s.siguiente.toque]}: {fechaHora(s.siguiente.fecha)}
+        </p>
+      ) : s.motivo ? (
+        <p className="text-text-3">{s.motivo}</p>
+      ) : enviada && s.toques.length > 0 ? (
+        <p className="text-text-3">Ya salieron los recordatorios.</p>
+      ) : null}
+      {c.estado === "enviada" && (
+        <div className="flex flex-wrap gap-3 pt-0.5">
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => onAccion("ahora")}
+            className="font-medium text-brand-text hover:underline"
+          >
+            Mandar recordatorio ahora
+          </button>
+          <button
+            type="button"
+            disabled={ocupado}
+            onClick={() => onAccion(c.seguimientoPausado ? "reanudar" : "pausar")}
+            className="font-medium text-text-2 hover:text-foreground"
+          >
+            {c.seguimientoPausado ? "Reanudar seguimiento" : "Detener seguimiento"}
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

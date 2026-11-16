@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from "drizzle-orm";
-import { integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
@@ -56,6 +56,25 @@ export const cotizacion = pgTable("agencia_cotizacion", {
   creadaPor: text("creada_por"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  /** Seguimiento detenido a mano para esta cotización. */
+  seguimientoPausado: boolean("seguimiento_pausado").notNull().default(false),
+  /** El cliente parece haber dicho que sí. */
+  senalTexto: text("senal_texto"),
+  senalEn: timestamp("senal_en"),
+  /** Hasta qué mensaje del cliente ya se revisó buscando el «sí». */
+  senalRevisadaHasta: timestamp("senal_revisada_hasta"),
+});
+
+/** Los recordatorios que salieron (o se intentaron) por cotización: uno de cada tipo. */
+export const cotizacionToque = pgTable("agencia_cotizacion_toque", {
+  id: text("id").primaryKey(),
+  organizationId: text("organization_id").notNull(),
+  cotizacionId: text("cotizacion_id").notNull(),
+  conversationId: text("conversation_id"),
+  toque: text("toque").$type<"texto" | "plantilla">().notNull(),
+  estado: text("estado").$type<"enviando" | "enviado" | "omitido" | "fallido">().notNull(),
+  detalle: text("detalle"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 const nano = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 20);
@@ -105,6 +124,25 @@ async function crear(): Promise<void> {
   await db.execute(
     sql`CREATE INDEX IF NOT EXISTS agencia_cotizacion_conv_idx ON agencia_cotizacion (organization_id, conversation_id, created_at)`
   );
+  // Seguimiento sin respuesta y el «sí» del cliente (2026-11-16): aditivo.
+  await db.execute(
+    sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS seguimiento_pausado boolean NOT NULL DEFAULT false`
+  );
+  await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_texto text`);
+  await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_en timestamp`);
+  await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_revisada_hasta timestamp`);
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS agencia_cotizacion_toque (
+      id text PRIMARY KEY,
+      organization_id text NOT NULL REFERENCES organization(id) ON DELETE CASCADE,
+      cotizacion_id text NOT NULL REFERENCES agencia_cotizacion(id) ON DELETE CASCADE,
+      conversation_id text,
+      toque text NOT NULL,
+      estado text NOT NULL,
+      detalle text,
+      created_at timestamp NOT NULL DEFAULT now(),
+      UNIQUE (cotizacion_id, toque)
+    )`);
 }
 
 // ------------------------------------------------------------------ config
@@ -169,6 +207,8 @@ export function aDto(f: Fila, ahora = new Date()): CotizacionDto {
     venceEn: f.venceEn?.toISOString() ?? null,
     enviadaEn: f.enviadaEn?.toISOString() ?? null,
     createdAt: f.createdAt.toISOString(),
+    seguimientoPausado: Boolean(f.seguimientoPausado),
+    senal: f.senalTexto && f.senalEn ? { texto: f.senalTexto, en: f.senalEn.toISOString() } : null,
   };
 }
 

@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ESTADO_INFO,
   MAX_PRODUCTOS,
+  PLANTILLA_SEGUIMIENTO_SUGERIDA,
   formatoDinero,
   type ConfigCotizaciones,
   type CotizacionDto,
@@ -30,14 +31,17 @@ import { pedirAceptar, textoDeAceptada } from "@/components/cotizaciones/aceptar
  * estado.
  */
 
+type Plantilla = { id: string; name: string; language: string; category: string; variables: number };
+
 type Datos = {
   config: ConfigCotizaciones;
   tieneLogo: boolean;
   cotizaciones: CotizacionDto[];
+  plantillas?: Plantilla[];
   puedeEditar: boolean;
 };
 
-type Pestana = "cotizaciones" | "productos" | "condiciones" | "negocio";
+type Pestana = "cotizaciones" | "productos" | "condiciones" | "seguimiento" | "negocio";
 
 const nuevoId = () => `p_${Math.random().toString(36).slice(2, 10)}`;
 
@@ -70,6 +74,8 @@ export function CotizacionesClient() {
   const cambiar = (parcial: Partial<ConfigCotizaciones>) => setConfig({ ...config, ...parcial });
   const cambiarNegocio = (parcial: Partial<ConfigCotizaciones["negocio"]>) =>
     setConfig({ ...config, negocio: { ...config.negocio, ...parcial } });
+  const cambiarSeguimiento = (parcial: Partial<ConfigCotizaciones["seguimiento"]>) =>
+    setConfig({ ...config, seguimiento: { ...config.seguimiento, ...parcial } });
   const cambiarProducto = (id: string, parcial: Partial<Producto>) =>
     cambiar({ productos: config.productos.map((p) => (p.id === id ? { ...p, ...parcial } : p)) });
 
@@ -132,6 +138,7 @@ export function CotizacionesClient() {
     { id: "cotizaciones", label: "Cotizaciones", cuenta: datos.cotizaciones.length },
     { id: "productos", label: "Productos", cuenta: config.productos.length },
     { id: "condiciones", label: "Condiciones" },
+    { id: "seguimiento", label: "Seguimiento" },
     { id: "negocio", label: "Mi negocio" },
   ];
 
@@ -226,6 +233,14 @@ export function CotizacionesClient() {
                       <span className="font-medium">{c.contactoNombre}</span>
                     )}
                     <span className="text-text-3">{formatoDinero(c.totales.total, c.moneda)}</span>
+                    {c.senal && (c.estado === "enviada" || c.estado === "vencida") && (
+                      <span
+                        title={`«${c.senal.texto}»`}
+                        className="rounded-full bg-success-tint px-2 py-0.5 text-[11px] font-medium text-success-text"
+                      >
+                        Parece que aceptó
+                      </span>
+                    )}
                     <span className="text-xs text-text-3">
                       {new Date(c.enviadaEn ?? c.createdAt).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
                     </span>
@@ -355,6 +370,96 @@ export function CotizacionesClient() {
                   <code>{"{vigencia}"}</code>. Solo sale si el cliente te escribió en las últimas 24 h.
                 </p>
               </div>
+            </section>
+            {botonGuardar}
+          </>
+        )}
+
+        {pestana === "seguimiento" && (
+          <>
+            <section className="space-y-3">
+              <div className="flex items-start gap-3">
+                <Switch checked={config.detectarSi} onCheckedChange={(v) => cambiar({ detectarSi: v })}
+                  label="Avisarme cuando el cliente diga que sí" disabled={!editable} />
+                <div>
+                  <p className="text-sm font-medium">Avisarme cuando el cliente diga que sí</p>
+                  <p className="text-xs text-muted-foreground">
+                    Si después de recibir la cotización el cliente escribe algo como «va, lo quiero» o «¿a qué cuenta
+                    deposito?», el botón «Cotizar» de la bandeja se pone verde con «¿Aceptó?» para que la marques
+                    aceptada con un clic. Nunca la acepta sola. Usa la IA de Ajustes → IA (el modelo barato).
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-3 border-t pt-4">
+              <div className="flex items-start gap-3">
+                <Switch checked={config.seguimiento.activo} onCheckedChange={(v) => cambiarSeguimiento({ activo: v })}
+                  label="Seguimiento a cotizaciones sin respuesta" disabled={!editable} />
+                <div>
+                  <p className="text-sm font-medium">Seguimiento a cotizaciones sin respuesta</p>
+                  <p className="text-xs text-muted-foreground">
+                    Si el cliente no contesta nada después de recibir la cotización, se le escribe solo. Se detiene en
+                    cuanto contesta, la marcas aceptada o rechazada, vence, o lo detienes en la cotización.
+                  </p>
+                </div>
+              </div>
+
+              {config.seguimiento.activo && (
+                <div className="space-y-4 rounded-md border p-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Switch checked={config.seguimiento.conTexto}
+                        onCheckedChange={(v) => cambiarSeguimiento({ conTexto: v })}
+                        label="Primer recordatorio con texto normal" disabled={!editable} />
+                      <span className="text-sm font-medium">1. Recordatorio antes de que se cierre la ventana de 24 h</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Sale como mensaje normal (sin plantilla, sin costo) unas 2 horas antes de que se cumplan 24 h
+                      del último mensaje del cliente.
+                    </p>
+                    {config.seguimiento.conTexto && (
+                      <>
+                        <Textarea id="cot-seg-texto" rows={2} maxLength={600} value={config.seguimiento.texto}
+                          disabled={!editable} aria-label="Texto del primer recordatorio"
+                          onChange={(e) => cambiarSeguimiento({ texto: e.target.value })} />
+                        <p className="text-xs text-muted-foreground">
+                          Usa <code>{"{nombre}"}</code>, <code>{"{producto}"}</code> y <code>{"{folio}"}</code>.
+                        </p>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="space-y-2 border-t pt-3">
+                    <p className="text-sm font-medium">2. Recordatorio con plantilla</p>
+                    <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
+                      <Numero label="A los (días)" value={config.seguimiento.dias} min={1} max={30} disabled={!editable}
+                        onChange={(v) => cambiarSeguimiento({ dias: v })} />
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cot-seg-plantilla">Plantilla</Label>
+                        <select id="cot-seg-plantilla" value={config.seguimiento.plantillaId ?? ""} disabled={!editable}
+                          onChange={(e) => cambiarSeguimiento({ plantillaId: e.target.value || null })}
+                          className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm">
+                          <option value="">Sin plantilla: solo sale el primer recordatorio</option>
+                          {(datos.plantillas ?? []).map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name} ({p.language} · {p.category})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Pasadas 24 h, WhatsApp solo deja mandar plantillas aprobadas. Da de alta una en{" "}
+                      <Link href="/settings/templates" className="font-medium text-brand-text underline underline-offset-2">
+                        Plantillas
+                      </Link>{" "}
+                      (categoría Marketing), por ejemplo: «{PLANTILLA_SEGUIMIENTO_SUGERIDA}». {"{{1}}"} es el nombre
+                      y {"{{2}}"} el producto.
+                    </p>
+                  </div>
+                </div>
+              )}
             </section>
             {botonGuardar}
           </>
