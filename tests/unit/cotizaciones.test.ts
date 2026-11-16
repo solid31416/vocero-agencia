@@ -5,12 +5,14 @@ import {
   PROMPT_SUGERENCIA,
   armarMensaje,
   calcularTotales,
+  conceptoDeCotizacion,
   configSchema,
   cotizacionInputSchema,
   estadoVisible,
   folioDe,
   formatoDinero,
   partidasDeSugerencia,
+  sePuedeAceptar,
   sugerenciaIaSchema,
   type Producto,
 } from "@/lib/cotizaciones";
@@ -240,5 +242,26 @@ describe("cotizaciones — bandera", () => {
     expect(cotizacionesEnabled()).toBe(false);
     process.env.COTIZACIONES = "on";
     expect(cotizacionesEnabled()).toBe(true);
+  });
+});
+
+describe("cotización aceptada → pedido", () => {
+  it("el concepto del pedido sale de las partidas", () => {
+    expect(
+      conceptoDeCotizacion([
+        { concepto: "Domo Modelo Arco", cantidad: 1 },
+        { concepto: "Instalación", cantidad: 2 },
+        { concepto: "  ", cantidad: 1 },
+      ])
+    ).toBe("Domo Modelo Arco, 2 × Instalación");
+    expect(conceptoDeCotizacion([{ concepto: "x".repeat(400), cantidad: 1 }])).toHaveLength(300);
+  });
+
+  it("solo se acepta lo que ya se mandó", () => {
+    expect(sePuedeAceptar("enviada")).toBe(true);
+    expect(sePuedeAceptar("vencida")).toBe(true);
+    expect(sePuedeAceptar("borrador")).toBe(false);
+    expect(sePuedeAceptar("rechazada")).toBe(false);
+    expect(sePuedeAceptar("aceptada")).toBe(false);
   });
 });

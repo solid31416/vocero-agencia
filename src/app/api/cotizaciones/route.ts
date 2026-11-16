@@ -3,6 +3,9 @@ import { apiError, parseBody, withAuth } from "@/lib/api";
 import { cotizacionInputSchema } from "@/lib/cotizaciones";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { aDto, guardarBorrador, leerConfig, listarCotizaciones } from "@/server/cotizaciones/store";
+import { pedidosEnabled } from "@/server/pedidos/flag";
+import { listarPedidos } from "@/server/pedidos/store";
+import { folioDe } from "@/lib/pedidos";
 
 export const dynamic = "force-dynamic";
 
@@ -11,12 +14,19 @@ export const GET = withAuth(async (session, req: Request) => {
   if (!cotizacionesEnabled()) return new Response(null, { status: 404 });
   const conversationId = new URL(req.url).searchParams.get("conversationId") ?? undefined;
   const org = session.organizationId;
-  const [cotizaciones, config] = await Promise.all([
+  const conPedidos = pedidosEnabled();
+  const [cotizaciones, config, pedidos] = await Promise.all([
     listarCotizaciones(org, { conversationId, limite: 20 }),
     leerConfig(org),
+    conPedidos ? listarPedidos(org, { conversationId }) : Promise.resolve([]),
   ]);
+  // Qué cotización ya tiene pedido (para no ofrecer crear otro).
+  const pedidoDeCotizacion: Record<string, string> = {};
+  for (const p of pedidos) if (p.cotizacionId) pedidoDeCotizacion[p.cotizacionId] ??= folioDe(p.numero);
   return Response.json({
     cotizaciones,
+    pedidosActivos: conPedidos,
+    pedidoDeCotizacion,
     productos: config.productos,
     condiciones: {
       ivaPct: config.ivaPct,

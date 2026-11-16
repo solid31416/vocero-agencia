@@ -7,7 +7,8 @@ import type { ConversationDto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { CotizacionDto } from "@/lib/cotizaciones";
+import { conceptoDeCotizacion, ESTADO_INFO, type CotizacionDto } from "@/lib/cotizaciones";
+import { pedirAceptar } from "@/components/cotizaciones/aceptar-cotizacion";
 import type { Etapa, PedidoDto } from "@/lib/pedidos";
 import { PedidoTarjeta } from "@/components/pedidos/pedido-tarjeta";
 
@@ -23,10 +24,7 @@ type Datos = { pedidos: PedidoDto[]; etapas: Etapa[] };
 
 /** Resumen de las partidas de una cotización para el concepto del pedido. */
 function conceptoDe(c: CotizacionDto): string {
-  return c.partidas
-    .map((p) => (p.cantidad === 1 ? p.concepto : `${p.cantidad} × ${p.concepto}`))
-    .join(", ")
-    .slice(0, 300);
+  return conceptoDeCotizacion(c.partidas);
 }
 
 export function PedidoPill({ conversation, puedeBorrar }: { conversation: ConversationDto; puedeBorrar: boolean }) {
@@ -120,6 +118,7 @@ function NuevoPedido({
   onCreado: () => void;
 }) {
   const [abierto, setAbierto] = useState(!hayOtros);
+  // Las cotizaciones mandadas (o ya aceptadas) que todavía no tienen pedido.
   const [aceptadas, setAceptadas] = useState<CotizacionDto[]>([]);
   const [cotizacionId, setCotizacionId] = useState<string | null>(null);
   const [concepto, setConcepto] = useState("");
@@ -129,7 +128,19 @@ function NuevoPedido({
   const [ocupado, setOcupado] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Si el módulo de cotizaciones está encendido, ofrece las aceptadas.
+  function usar(c: CotizacionDto | null) {
+    setCotizacionId(c?.id ?? null);
+    if (c) {
+      setConcepto(conceptoDe(c));
+      setMonto(String(c.totales.total));
+    } else {
+      setConcepto("");
+      setMonto("");
+    }
+  }
+
+  // Si el módulo de cotizaciones está encendido, el pedido se llena solo con
+  // la cotización más reciente que no tenga pedido (aceptada o solo mandada).
   useEffect(() => {
     if (!abierto) return;
     void (async () => {
@@ -137,8 +148,19 @@ function NuevoPedido({
         () => null
       );
       if (!res?.ok) return;
-      const d = (await res.json()) as { cotizaciones: CotizacionDto[] };
-      setAceptadas(d.cotizaciones.filter((c) => c.estado === "aceptada"));
+      const d = (await res.json()) as {
+        cotizaciones: CotizacionDto[];
+        pedidoDeCotizacion?: Record<string, string>;
+      };
+      const libres = d.cotizaciones.filter(
+        (c) =>
+          (c.estado === "aceptada" || c.estado === "enviada" || c.estado === "vencida") &&
+          !d.pedidoDeCotizacion?.[c.id]
+      );
+      // Primero las aceptadas; dentro, la más nueva (la lista ya viene de la más nueva).
+      libres.sort((a, b) => Number(b.estado === "aceptada") - Number(a.estado === "aceptada"));
+      setAceptadas(libres);
+      if (libres[0]) usar(libres[0]);
     })();
   }, [abierto, conversation.id]);
 
@@ -153,6 +175,25 @@ function NuevoPedido({
   async function crear() {
     setOcupado(true);
     setError(null);
+    // Desde una cotización: la marca aceptada y crea el pedido en un paso.
+    if (cotizacionId) {
+      const r = await pedirAceptar(cotizacionId, {
+        crearPedido: true,
+        avisar,
+        fechaEstimada: fecha || null,
+        concepto,
+        monto: monto.trim() ? Number(monto) : null,
+      });
+      setOcupado(false);
+      if (!r.ok) return setError(r.error);
+      if (!r.r.pedido) return setError(r.r.avisoPedido ?? "No se pudo crear el pedido");
+      setConcepto("");
+      setMonto("");
+      setFecha("");
+      setCotizacionId(null);
+      setAbierto(false);
+      return onCreado();
+    }
     const res = await fetch("/api/pedidos", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -183,27 +224,23 @@ function NuevoPedido({
       <p className="text-sm font-medium">Nuevo pedido</p>
       {aceptadas.length > 0 && (
         <div className="space-y-1">
-          <Label htmlFor="pedido-cotizacion">Desde una cotización aceptada</Label>
+          <Label htmlFor="pedido-cotizacion">Desde la cotización</Label>
           <select
             id="pedido-cotizacion"
             value={cotizacionId ?? ""}
-            onChange={(e) => {
-              const c = aceptadas.find((x) => x.id === e.target.value) ?? null;
-              setCotizacionId(c?.id ?? null);
-              if (c) {
-                setConcepto(conceptoDe(c));
-                setMonto(String(c.totales.total));
-              }
-            }}
+            onChange={(e) => usar(aceptadas.find((x) => x.id === e.target.value) ?? null)}
             className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
           >
             <option value="">— Escribirlo a mano —</option>
             {aceptadas.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.folio} · ${c.totales.total.toLocaleString("es-MX")}
+                {c.folio} · ${c.totales.total.toLocaleString("es-MX")} · {ESTADO_INFO[c.estado].etiqueta}
               </option>
             ))}
           </select>
+          {cotizacionId && aceptadas.find((c) => c.id === cotizacionId)?.estado !== "aceptada" && (
+            <p className="text-xs text-text-3">Al crear el pedido, la cotización queda como «Aceptada».</p>
+          )}
         </div>
       )}
       <div className="space-y-1">

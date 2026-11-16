@@ -168,6 +168,23 @@ export function armarMensaje(
     .trim();
 }
 
+/**
+ * Lo que dice el pedido que nace de una cotización: sus partidas en una
+ * línea («2 × Domo Estándar, Instalación»), del largo que cabe en el pedido.
+ */
+export function conceptoDeCotizacion(partidas: readonly Pick<Partida, "concepto" | "cantidad">[]): string {
+  return partidas
+    .filter((p) => p.concepto.trim())
+    .map((p) => (p.cantidad === 1 ? p.concepto.trim() : `${p.cantidad} × ${p.concepto.trim()}`))
+    .join(", ")
+    .slice(0, 300);
+}
+
+/** Se acepta lo que ya se mandó (aunque haya vencido: el cliente puede decir que sí tarde). */
+export function sePuedeAceptar(estado: EstadoCotizacion): boolean {
+  return estado === "enviada" || estado === "vencida";
+}
+
 /** Una enviada cuya vigencia ya pasó se ve como vencida (sin revisor de fondo). */
 export function estadoVisible(estado: EstadoCotizacion, venceEn: Date | null, ahora = new Date()): EstadoCotizacion {
   if (estado === "enviada" && venceEn && venceEn.getTime() < ahora.getTime()) return "vencida";

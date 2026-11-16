@@ -19,6 +19,7 @@ import {
   type Producto,
 } from "@/lib/cotizaciones";
 import { EstadoChip } from "@/components/settings/cotizaciones-client";
+import { AceptarCotizacion } from "@/components/cotizaciones/aceptar-cotizacion";
 
 /**
  * Módulo de la agencia (Treviño AI) — «Cotizar» en el encabezado del hilo.
@@ -39,7 +40,15 @@ type Condiciones = {
   moneda: "MXN" | "USD";
 };
 
-type Datos = { cotizaciones: CotizacionDto[]; productos: Producto[]; condiciones: Condiciones };
+type Datos = {
+  cotizaciones: CotizacionDto[];
+  productos: Producto[];
+  condiciones: Condiciones;
+  /** Módulo de pedidos encendido: «Marcar aceptada» crea el pedido. */
+  pedidosActivos?: boolean;
+  /** Cotización → folio del pedido que ya nació de ella. */
+  pedidoDeCotizacion?: Record<string, string>;
+};
 
 const partidaVacia = (): Partida => ({
   productoId: null,
@@ -121,6 +130,14 @@ function VentanaCotizar({
       }
     })();
   }, [conversation.id]);
+
+  /** Relee la lista (tras aceptar una) sin tocar el borrador que se está armando. */
+  async function recargarLista() {
+    const res = await fetch(`/api/cotizaciones?conversationId=${encodeURIComponent(conversation.id)}`).catch(
+      () => null
+    );
+    if (res?.ok) setDatos((await res.json()) as Datos);
+  }
 
   const totales = useMemo(
     () =>
@@ -467,6 +484,17 @@ function VentanaCotizar({
                         {c.folio}
                       </a>
                       <span className="text-text-3">{formatoDinero(c.totales.total, c.moneda)}</span>
+                      <span className="ml-auto">
+                        <AceptarCotizacion
+                          cotizacion={c}
+                          pedidosActivos={Boolean(datos?.pedidosActivos)}
+                          pedidoFolio={datos?.pedidoDeCotizacion?.[c.id] ?? null}
+                          onListo={(texto, ok) => {
+                            setAviso({ ok, texto });
+                            void recargarLista();
+                          }}
+                        />
+                      </span>
                     </li>
                   ))}
                 </ul>

@@ -19,6 +19,7 @@ import {
   type CotizacionDto,
   type Producto,
 } from "@/lib/cotizaciones";
+import { pedirAceptar, textoDeAceptada } from "@/components/cotizaciones/aceptar-cotizacion";
 
 /**
  * Módulo de la agencia (Treviño AI) — Ajustes → Cotizaciones.
@@ -111,6 +112,13 @@ export function CotizacionesClient() {
     void cargar();
   }
 
+  /** Aceptada: con el módulo de pedidos, también nace su pedido (sin avisarle al cliente desde aquí). */
+  async function aceptar(c: CotizacionDto) {
+    const r = await pedirAceptar(c.id, { crearPedido: true, avisar: false, fechaEstimada: null });
+    setAviso(r.ok ? { ok: !r.r.avisoPedido, texto: textoDeAceptada(c.folio, r.r) } : { ok: false, texto: r.error });
+    void cargar();
+  }
+
   async function cambiarEstado(id: string, estado: "aceptada" | "rechazada" | "enviada") {
     await fetch(`/api/cotizaciones/${id}`, {
       method: "PATCH",
@@ -191,8 +199,14 @@ export function CotizacionesClient() {
         {pestana === "cotizaciones" && (
           <>
             <p className="text-sm text-muted-foreground">
-              Márcalas como aceptadas o rechazadas cuando el cliente conteste.
+              Márcalas como aceptadas o rechazadas cuando el cliente conteste. Al marcarla aceptada se crea su pedido
+              (si tienes Pedidos encendido).
             </p>
+            {aviso && (
+              <p role="status" className={cn("text-sm", aviso.ok ? "text-success-text" : "text-danger-text")}>
+                {aviso.texto}
+              </p>
+            )}
             {datos.cotizaciones.length === 0 ? (
               <p className="text-sm text-muted-foreground">Todavía no hay ninguna. Se hacen desde la bandeja: «Cotizar».</p>
             ) : (
@@ -217,7 +231,7 @@ export function CotizacionesClient() {
                     </span>
                     {(c.estado === "enviada" || c.estado === "vencida") && (
                       <span className="ml-auto flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => void cambiarEstado(c.id, "aceptada")}>
+                        <Button size="sm" variant="outline" onClick={() => void aceptar(c)}>
                           Aceptada
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => void cambiarEstado(c.id, "rechazada")}>
