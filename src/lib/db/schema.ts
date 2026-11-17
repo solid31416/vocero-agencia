@@ -391,6 +391,9 @@ export const conversation = pgTable(
         "ventana",
         "hostilidad",
         "manual_reply",
+        // Módulo de la agencia (texto libre en la base: sin migración).
+        "cotizacion_aceptada",
+        "cotizacion",
       ],
     }),
     lastInboundAt: timestamp("last_inbound_at"),

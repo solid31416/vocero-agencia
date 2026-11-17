@@ -166,6 +166,13 @@ describe("toHandoffReason (el handoff nunca se pierde por el motivo)", () => {
   it("tolera mayúsculas y espacios de sobra", () => {
     expect(toHandoffReason("  Hostilidad ")).toBe("hostilidad");
   });
+
+  it("módulo de la agencia: los traspasos por cotización se reconocen", () => {
+    expect(toHandoffReason("cotizacion_aceptada")).toBe("cotizacion_aceptada");
+    expect(toHandoffReason("cotizacion")).toBe("cotizacion");
+    expect(toHandoffReason("Cotización lista para preparar: 2 domos Mini")).toBe("cotizacion");
+    expect(toHandoffReason("Aceptó la cotización COT-0099")).toBe("cotizacion_aceptada");
+  });
 });
 
 describe("mergeFicha", () => {

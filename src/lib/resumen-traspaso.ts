@@ -65,6 +65,8 @@ export const MOTIVO_TEXTO: Record<string, string> = {
   hostilidad: "El cliente se molestó",
   manual: "Una persona pausó la IA",
   pedido: "Se pidió desde la bandeja (la IA sigue contestando)",
+  cotizacion_aceptada: "El cliente aceptó su cotización: falta el anticipo",
+  cotizacion: "La cotización la prepara una persona (rebasa lo que el agente cotiza)",
 };
 
 export function textoMotivo(motivo: string | null | undefined): string {

@@ -14,13 +14,20 @@ export const HANDOFF_REASONS = [
   "error",
   "ventana",
   "hostilidad",
+  // Módulo de la agencia (vendedor): el cliente aceptó su cotización, o la
+  // cotización rebasa lo que el agente puede cotizar y la hace una persona.
+  "cotizacion_aceptada",
+  "cotizacion",
 ] as const;
 
 export type HandoffReason = (typeof HANDOFF_REASONS)[number];
 
 export function toHandoffReason(raw: string | undefined | null): HandoffReason {
   const v = raw?.trim().toLowerCase() ?? "";
-  return (HANDOFF_REASONS as readonly string[]).includes(v)
-    ? (v as HandoffReason)
-    : "modelo";
+  if ((HANDOFF_REASONS as readonly string[]).includes(v)) return v as HandoffReason;
+  // Módulo de la agencia: el modelo a veces lo dice con sus palabras
+  // («Cotización lista para preparar: 2 domos…»).
+  const n = v.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (n.includes("cotiz")) return /\bacept/.test(n) ? "cotizacion_aceptada" : "cotizacion";
+  return "modelo";
 }
