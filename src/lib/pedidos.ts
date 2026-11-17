@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Envio } from "@/lib/fletes";
 import { primerNombre } from "@/lib/recordatorios";
 
 /**
@@ -319,6 +320,10 @@ export type PedidoDto = {
   tocaCobrar: boolean;
   /** El último recordatorio de saldo al cliente: para qué fecha de cobro, cuándo y cómo salió. */
   saldoRecordado: { para: string; en: string; ok: boolean; detalle: string | null } | null;
+  /** Módulo de la agencia — Fletes: el seguimiento del envío. */
+  envio: Envio | null;
+  /** Ya pasó la entrega estimada y no se ha entregado. */
+  envioAtrasado: boolean;
   creadoEn: string;
   actualizadoEn: string;
 };

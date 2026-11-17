@@ -144,6 +144,22 @@
                     "type": "number",
                     "minimum": 0,
                     "description": "Solo si el vendedor puede dar descuento, hasta su máximo."
+                  },
+                  "destino": {
+                    "type": "object",
+                    "nullable": true,
+                    "description": "A dónde va. Si el vendedor puede cotizar extras, el CRM agrega el flete del tabulador (Ventas → Fletes).",
+                    "required": [
+                      "estado"
+                    ],
+                    "properties": {
+                      "estado": {
+                        "type": "string"
+                      },
+                      "ciudad": {
+                        "type": "string"
+                      }
+                    }
                   }
                 }
               }
@@ -182,6 +198,19 @@
                     },
                     "resumen": {
                       "type": "string"
+                    },
+                    "flete": {
+                      "enum": [
+                        "incluido",
+                        "sin_tarifa",
+                        "no_permitido",
+                        "sin_destino"
+                      ],
+                      "description": "Qué pasó con el flete."
+                    },
+                    "fleteMonto": {
+                      "type": "string",
+                      "nullable": true
                     }
                   }
                 }

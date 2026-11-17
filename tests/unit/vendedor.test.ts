@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG_POR_DEFECTO, configSchema, productoSchema } from "@/lib/cotizaciones";
-import { revisarPedidoDelAgente, VENDEDOR_POR_DEFECTO, vendedorSchema, type ConfigVendedor } from "@/lib/vendedor";
+import { piezasDelPedido, revisarPedidoDelAgente, VENDEDOR_POR_DEFECTO, vendedorSchema, type ConfigVendedor } from "@/lib/vendedor";
 
 /** Módulo de la agencia — el agente como vendedor: precios del catálogo y límites del dueño. */
 
@@ -85,5 +85,25 @@ describe("vendedor", () => {
     expect(pedir([{ productoId: "mini", cantidad: 1 }], 10, conDescuento)).toMatchObject({ codigo: "descuento_alto" });
     const r = pedir([{ productoId: "mini", cantidad: 1 }], 5, conDescuento);
     expect(r.ok && r.totales.descuento).toBe(6250);
+  });
+  it("el flete del tabulador entra a la cotización, sin el flete genérico del catálogo, y cuenta para el tope", () => {
+    const flete = { productoId: null, concepto: "Flete a Allende", descripcion: "", cantidad: 1, unidad: "servicio", precio: 15000 };
+    const conExtras = { ...activo, extras: { activo: true } };
+    const r = revisarPedidoDelAgente(
+      { items: [{ productoId: "mini", cantidad: 2 }, { productoId: "flete", cantidad: 1 }], descuentoPct: 0 },
+      productos,
+      conExtras,
+      opciones,
+      flete
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.partidas.map((p) => p.concepto)).toEqual(["Domo Modelo Mini", "Flete a Allende"]);
+    expect(r.totales.subtotal).toBe(265000);
+    const topeJusto = { ...conExtras, tope: { activo: true, monto: 300000 } };
+    expect(
+      revisarPedidoDelAgente({ items: [{ productoId: "mini", cantidad: 2 }], descuentoPct: 0 }, productos, topeJusto, opciones, flete)
+    ).toMatchObject({ codigo: "tope" });
+    expect(piezasDelPedido({ items: [{ productoId: "mini", cantidad: 2 }, { productoId: "flete", cantidad: 3 }] }, productos)).toBe(2);
   });
 });

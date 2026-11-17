@@ -1,13 +1,16 @@
 import { eq } from "drizzle-orm";
-import { formatoDinero, folioDe } from "@/lib/cotizaciones";
+import { formatoDinero, folioDe, type Partida } from "@/lib/cotizaciones";
 import { getDb, schema } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { scoped } from "@/lib/db/tenant";
 import { normalizeMx } from "@/lib/meta/client";
-import { revisarPedidoDelAgente, type PedidoDelAgente } from "@/lib/vendedor";
+import { conceptoDeFlete, destinosConTarifa, opcionesDeFlete } from "@/lib/fletes";
+import { piezasDelPedido, revisarPedidoDelAgente, type PedidoDelAgente } from "@/lib/vendedor";
 import { avisarAlDueno } from "@/server/contador-mensajes/worker";
 import { publish } from "@/server/events/bus";
 import { crearNotaDelSistema } from "@/server/notas";
+import { leerFletes } from "@/server/fletes/store";
+import { hoyIso } from "@/server/pedidos/store";
 import { leerConfig as leerResumen } from "@/server/resumen-traspaso/store";
 import { enviarCotizacion } from "./servicio";
 import {
@@ -37,8 +40,17 @@ export type ResultadoAgente =
       total: string;
       anticipo: string;
       resumen: string;
+      /**
+       * El flete: «incluido» (del tabulador), «sin_tarifa» (no hay para ese
+       * destino), «no_permitido» (el vendedor no cotiza extras) o
+       * «sin_destino» (no dijo a dónde va).
+       */
+      flete: EstadoFlete;
+      fleteMonto: string | null;
     }
   | { ok: false; status: number; codigo: string; detalle: string; paraPersona: boolean };
+
+export type EstadoFlete = "incluido" | "sin_tarifa" | "no_permitido" | "sin_destino";
 
 export async function cotizarDelAgente(input: {
   organizationId: string;
@@ -48,11 +60,36 @@ export async function cotizarDelAgente(input: {
   const { organizationId, pedido, esPrueba } = input;
   const config = await leerConfig(organizationId);
   const vendedor = config.vendedor;
-  const revision = revisarPedidoDelAgente(pedido, config.productos, vendedor, {
-    ivaPct: config.ivaPct,
-    preciosConIva: config.preciosConIva,
-    anticipoPct: config.anticipoPct,
-  });
+  const moneda = config.moneda ?? "MXN";
+  // El flete sale del tabulador (Ventas → Fletes), nunca del agente.
+  let flete: EstadoFlete = "sin_destino";
+  let partidaFlete: Partida | null = null;
+  if (pedido.destino?.estado) {
+    if (!vendedor.extras.activo) flete = "no_permitido";
+    else {
+      const fletes = await leerFletes(organizationId);
+      const piezas = piezasDelPedido(pedido, config.productos);
+      const [mejor] = piezas > 0 ? opcionesDeFlete(fletes, { ...pedido.destino, piezas }, hoyIso()) : [];
+      if (mejor) {
+        flete = "incluido";
+        partidaFlete = {
+          productoId: null,
+          concepto: conceptoDeFlete(mejor, pedido.destino, fletes.origen),
+          descripcion: mejor.dias ? `Entrega estimada: ${mejor.dias}` : "",
+          cantidad: 1,
+          unidad: "servicio",
+          precio: mejor.precio,
+        };
+      } else flete = "sin_tarifa";
+    }
+  }
+  const revision = revisarPedidoDelAgente(
+    pedido,
+    config.productos,
+    vendedor,
+    { ivaPct: config.ivaPct, preciosConIva: config.preciosConIva, anticipoPct: config.anticipoPct },
+    partidaFlete
+  );
   if (!revision.ok) {
     return {
       ok: false,
@@ -108,7 +145,6 @@ export async function cotizarDelAgente(input: {
     return { ok: false, status: 409, codigo: guardada.codigo, detalle: guardada.detalle, paraPersona: true };
   }
   const fila = guardada.fila;
-  const moneda = config.moneda ?? "MXN";
   const folio = folioDe(fila.numero);
   const total = formatoDinero(fila.totales.total, moneda);
   const anticipo = formatoDinero(fila.totales.anticipo, moneda);
@@ -142,7 +178,16 @@ export async function cotizarDelAgente(input: {
   publish(organizationId, { type: "conversation.updated", data: { conversation: { id: conversationId } } });
   if (vendedor.avisarWhatsapp && !esPrueba) void avisarPorWhatsapp(organizationId, conversationId, nota);
 
-  return { ok: true, estado, folio, total, anticipo, resumen };
+  return {
+    ok: true,
+    estado,
+    folio,
+    total,
+    anticipo,
+    resumen,
+    flete,
+    fleteMonto: partidaFlete ? formatoDinero(partidaFlete.precio, moneda) : null,
+  };
 }
 
 async function nombreDelAgente(organizationId: string): Promise<string> {
@@ -186,6 +231,11 @@ async function avisarPorWhatsapp(organizationId: string, conversationId: string,
 
 /** Lo que el agente recibe en su contexto para vender (o null si no vende). */
 export type VendedorParaAgente = {
+  /**
+   * Fletes: a qué destinos hay tarifa en el tabulador (sin precios ni
+   * transportistas). null = no cotiza flete (extras apagados o sin tarifas).
+   */
+  fletes: { destinos: string[] } | null;
   preciosEnChat: boolean;
   modoEnvio: "aprobar" | "sola";
   moneda: "MXN" | "USD";
@@ -231,7 +281,10 @@ export async function vendedorParaElAgente(
     }));
   if (!productos.some((p) => !p.extra)) return null;
   const borrador = await borradorDeConversacion(organizationId, conversationId);
+  const tabulador = v.extras.activo ? await leerFletes(organizationId).catch(() => null) : null;
+  const destinos = tabulador ? destinosConTarifa(tabulador) : [];
   return {
+    fletes: destinos.length > 0 ? { destinos: destinos.slice(0, 80) } : null,
     preciosEnChat: v.preciosEnChat,
     modoEnvio: v.modoEnvio,
     moneda,

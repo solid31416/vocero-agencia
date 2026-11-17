@@ -33,6 +33,14 @@ export const pedidoDelAgenteSchema = z.object({
   /** A nombre de quién (persona o empresa). Vacío = el nombre del contacto. */
   cliente: z.string().trim().max(120).default(""),
   descuentoPct: z.coerce.number().min(0).max(100).default(0),
+  /** A dónde va (para el flete del tabulador). Sin destino, el flete no va. */
+  destino: z
+    .object({
+      estado: z.string().trim().max(40),
+      ciudad: z.string().trim().max(60).default(""),
+    })
+    .nullable()
+    .default(null),
 });
 export type PedidoDelAgente = z.infer<typeof pedidoDelAgenteSchema>;
 
@@ -46,6 +54,16 @@ export type RevisionDelAgente =
       paraPersona: boolean;
     };
 
+/** Las piezas de producto (sin extras) que pidió el agente: para buscar el flete. */
+export function piezasDelPedido(pedido: Pick<PedidoDelAgente, "items">, productos: readonly Producto[]): number {
+  let n = 0;
+  for (const it of pedido.items) {
+    const p = productos.find((x) => x.id === it.productoId);
+    if (p && !p.extra) n += it.cantidad;
+  }
+  return n;
+}
+
 /**
  * Pura: revisa lo que pidió el agente contra el catálogo y los límites del
  * dueño. Devuelve las partidas con los precios de la lista, o por qué no.
@@ -54,7 +72,9 @@ export function revisarPedidoDelAgente(
   pedido: Pick<PedidoDelAgente, "items" | "descuentoPct">,
   productos: readonly Producto[],
   vendedor: ConfigVendedor,
-  opciones: { ivaPct: number; preciosConIva: boolean; anticipoPct: number }
+  opciones: { ivaPct: number; preciosConIva: boolean; anticipoPct: number },
+  /** El flete del tabulador (Fletes), ya calculado por el CRM. */
+  flete: Partida | null = null
 ): RevisionDelAgente {
   if (!vendedor.activo) {
     return { ok: false, codigo: "vendedor_apagado", detalle: "El agente no tiene permiso de cotizar", paraPersona: true };
@@ -75,6 +95,8 @@ export function revisarPedidoDelAgente(
         paraPersona: false,
       };
     }
+    // Con el flete del tabulador, un «flete» genérico del catálogo saldría doble.
+    if (flete && p.extra && /flete/i.test(p.nombre)) continue;
     if (p.extra && !vendedor.extras.activo) {
       return {
         ok: false,
@@ -131,6 +153,7 @@ export function revisarPedidoDelAgente(
     }
   }
 
+  if (flete) partidas.push(flete);
   const totales = calcularTotales(partidas, { descuentoPct, ...opciones });
   if (vendedor.tope.activo && totales.total > vendedor.tope.monto) {
     return {

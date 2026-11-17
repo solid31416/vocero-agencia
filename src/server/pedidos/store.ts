@@ -3,6 +3,7 @@ import { boolean, date, integer, jsonb, numeric, pgTable, text, timestamp } from
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
+import { envioAtrasado, type Envio } from "@/lib/fletes";
 import {
   CONFIG_POR_DEFECTO,
   configSchema,
@@ -56,6 +57,8 @@ export const pedido = pgTable("agencia_pedido", {
   saldoRecordadoEn: timestamp("saldo_recordado_en"),
   saldoRecordadoOk: boolean("saldo_recordado_ok"),
   saldoRecordadoDetalle: text("saldo_recordado_detalle"),
+  /** Módulo de la agencia — Fletes: el seguimiento del envío (null = sin envío). */
+  envio: jsonb("envio").$type<Envio>(),
   borrado: boolean("borrado").notNull().default(false),
   creadoPor: text("creado_por"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -117,6 +120,8 @@ async function crear(): Promise<void> {
   await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_en timestamp`);
   await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_ok boolean`);
   await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS saldo_recordado_detalle text`);
+  // Seguimiento del envío (Fletes, 2026-11-17).
+  await db.execute(sql`ALTER TABLE agencia_pedido ADD COLUMN IF NOT EXISTS envio jsonb`);
 }
 
 /** Hoy en AAAA-MM-DD, en la zona de México (el negocio). */
@@ -167,6 +172,8 @@ export function aDto(f: FilaPedido, config: ConfigPedidos): PedidoDto {
             detalle: f.saldoRecordadoDetalle ?? null,
           }
         : null,
+    envio: f.envio ?? null,
+    envioAtrasado: f.envio ? envioAtrasado(f.envio, hoyIso()) : false,
     id: f.id,
     folio: folioDe(f.numero),
     conversationId: f.conversationId,

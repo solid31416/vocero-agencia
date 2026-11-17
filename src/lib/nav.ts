@@ -161,6 +161,7 @@ export function settingsSections({
   const ventas: SettingsLink[] = [];
   if (cotizaciones) ventas.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
   if (cotizaciones) ventas.push({ href: "/settings/vendedor", label: "Vendedor" });
+  if (cotizaciones) ventas.push({ href: "/settings/fletes", label: "Fletes" });
   if (pedidos) ventas.push({ href: "/settings/pedidos", label: "Pedidos" });
   if (seguimiento) ventas.push({ href: "/settings/seguimiento", label: "Seguimiento" });
   if (biblioteca) ventas.push({ href: "/settings/biblioteca", label: "Biblioteca" });

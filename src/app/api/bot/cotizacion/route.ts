@@ -68,5 +68,7 @@ export async function POST(req: Request) {
     total: r.total,
     anticipo: r.anticipo,
     resumen: r.resumen,
+    flete: r.flete,
+    fleteMonto: r.fleteMonto,
   });
 }

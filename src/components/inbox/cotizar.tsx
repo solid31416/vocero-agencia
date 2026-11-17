@@ -22,6 +22,7 @@ import {
 } from "@/lib/cotizaciones";
 import { EstadoChip } from "@/components/settings/cotizaciones-client";
 import { AceptarCotizacion } from "@/components/cotizaciones/aceptar-cotizacion";
+import { FleteCotizador } from "@/components/cotizaciones/flete-cotizador";
 
 /**
  * Módulo de la agencia (Treviño AI) — «Cotizar» en el encabezado del hilo.
@@ -515,6 +516,16 @@ function VentanaCotizar({
               >
                 <Plus className="mr-1 h-4 w-4" aria-hidden /> Agregar partida
               </Button>
+            )}
+            {partidas.length < MAX_PARTIDAS && (
+              <FleteCotizador
+                partidas={partidas}
+                productos={datos.productos}
+                moneda={moneda}
+                onAgregar={(nueva) =>
+                  setPartidas((ps) => [...ps.filter((p) => p.concepto.trim() || p.precio > 0), nueva])
+                }
+              />
             )}
 
             <div className="space-y-1.5">
