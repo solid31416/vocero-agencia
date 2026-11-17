@@ -9,6 +9,7 @@ import { apiError, parseBody } from "@/lib/api";
 import { requireBotKey, resolveInstanceOrg } from "@/server/bot/auth";
 import { SendError, sendText } from "@/server/inbox/send";
 import { guardarRespuestaDePrueba } from "@/server/lab/sandbox";
+import { vigilarPromesaDeTraspaso } from "@/server/bot/promesa-traspaso";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,8 @@ export async function POST(req: Request) {
       text: body.data.text,
       aiGenerated: true,
     });
+    // Módulo de la agencia: si prometió una persona y no pide el traspaso, lo hace el CRM.
+    vigilarPromesaDeTraspaso(organizationId, body.data.conversationId, body.data.text);
     return Response.json({ messageId: result.messageId });
   } catch (err) {
     if (err instanceof SendError) {

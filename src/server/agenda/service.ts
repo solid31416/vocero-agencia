@@ -23,6 +23,9 @@ import {
 } from "@/server/agenda/connectors";
 import { ConnectorError } from "@/server/agenda/connectors/types";
 import { moveLeadToStage } from "@/server/leads/stage-history";
+import { etapaAlAgendar } from "@/lib/agenda-etapa";
+import { esEtapaDeCotizacion } from "@/lib/cotizaciones";
+import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
 import { publish } from "@/server/events/bus";
 
 /**
@@ -686,8 +689,10 @@ async function getContactName(
 }
 
 /**
- * El lead avanza a la siguiente etapa abierta al agendar — solo hacia adelante,
- * nunca retrocede.
+ * El lead avanza al agendar — solo hacia adelante, nunca retrocede. Módulo de
+ * la agencia: a la etapa de visita / demo / cita si el embudo tiene una (si
+ * ya la pasó, no se mueve); si no, a la siguiente abierta sin caer en la de
+ * «Cotización enviada», que pone el CRM (`src/lib/agenda-etapa.ts`).
  *
  * Pasa por `moveLeadToStage`, la única puerta que puede escribir `stage_id`:
  * mover el lead y registrar el movimiento en la bitácora son la misma
@@ -717,6 +722,7 @@ async function advanceLeadStage(
   const stages = await db
     .select({
       id: schema.pipelineStage.id,
+      name: schema.pipelineStage.name,
       position: schema.pipelineStage.position,
       kind: schema.pipelineStage.kind,
     })
@@ -724,10 +730,11 @@ async function advanceLeadStage(
     .where(scoped(schema.pipelineStage.organizationId, organizationId))
     .orderBy(asc(schema.pipelineStage.position));
 
-  const currentIdx = stages.findIndex((s) => s.id === lead.stageId);
-  if (currentIdx < 0) return;
-  const nextOpen = stages.find((s, i) => i > currentIdx && s.kind === "open");
-  if (!nextOpen) return; // ya está en la última etapa abierta (o en un ancla)
+  const conCotizaciones = cotizacionesEnabled();
+  const nextOpen = etapaAlAgendar(stages, lead.stageId, {
+    saltar: (nombre) => conCotizaciones && esEtapaDeCotizacion(nombre),
+  });
+  if (!nextOpen) return; // ya pasó la visita, está en la última abierta o en un ancla
 
   await moveLeadToStage({
     organizationId,

@@ -15,6 +15,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { TemplateDto } from "@/lib/types";
+import type { PlantillaVentas } from "@/lib/plantillas-ventas";
+import { PlantillasDeVentas } from "@/components/settings/plantillas-ventas";
 import {
   countVariables,
   renderBody,
@@ -100,7 +102,7 @@ function normalizeName(value: string): string {
     .replace(/[^a-z0-9_]/g, "");
 }
 
-export function TemplatesClient() {
+export function TemplatesClient({ ventas = [] }: { ventas?: readonly PlantillaVentas[] } = {}) {
   const [templates, setTemplates] = useState<TemplateDto[] | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
@@ -162,6 +164,8 @@ export function TemplatesClient() {
   return (
     <div className="max-w-3xl space-y-6">
       <HowItWorks defaultOpen={empty} />
+
+      <PlantillasDeVentas lista={ventas} templates={templates} onCreadas={() => void refetch()} />
 
       <section className="space-y-3" aria-labelledby="tpl-list-title">
         <div className="flex flex-wrap items-center justify-between gap-3">
