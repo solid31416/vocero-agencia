@@ -3,6 +3,7 @@ import {
   fechaLarga,
   formatoDinero,
   renglonesDePago,
+  TEXTO_ACEPTAR_POR_DEFECTO,
   textoComoAceptar,
   type ConfigCotizaciones,
   type Partida,
@@ -277,8 +278,9 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
 
   // ---------------------------------------------------------------- cómo aceptar
   // Módulo de la agencia: lo que tiene que hacer el cliente para cerrar, a la
-  // vista. Las cotizaciones guardadas antes no lo traen.
-  const aceptar = (d.condiciones.comoAceptar ?? "").trim();
+  // vista. Las cotizaciones guardadas antes no lo traen: llevan el de siempre
+  // (vacío a propósito sí quita el recuadro).
+  const aceptar = (d.condiciones.comoAceptar ?? TEXTO_ACEPTAR_POR_DEFECTO).trim();
   if (aceptar) {
     const llamado = textoComoAceptar(aceptar, {
       anticipo: dinero(t.anticipo > 0 ? t.anticipo : t.total),

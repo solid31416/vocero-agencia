@@ -135,8 +135,8 @@ export default async function ContactoPage({ params }: { params: Promise<{ id: s
 
       <div className="flex flex-wrap items-center gap-3">
         <ContactAvatar name={contacto.name} seed={contacto.id} />
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate text-xl font-semibold">{contacto.name}</h1>
+        <div className="min-w-[60%] flex-1 sm:min-w-0">
+          <h1 className="break-words text-xl font-semibold">{contacto.name}</h1>
           <p className="text-sm text-muted-foreground">{formatPhone(contacto.phone)}</p>
         </div>
         <Link
