@@ -17,6 +17,7 @@ import {
   CREADA_POR_AGENTE,
   guardarBorrador,
   leerConfig,
+  listarCotizaciones,
 } from "./store";
 
 /**
@@ -245,5 +246,39 @@ export async function vendedorParaElAgente(
       borrador && borrador.creadaPor === CREADA_POR_AGENTE
         ? { folio: folioDe(borrador.numero), total: formatoDinero(borrador.totales.total, moneda) }
         : null,
+  };
+}
+
+/** La última cotización que ya le llegó al cliente, para que el agente sepa qué acepta. */
+export type CotizacionParaAgente = {
+  folio: string;
+  /** enviada | aceptada | vencida (visible). */
+  estado: string;
+  total: string;
+  anticipo: string | null;
+  resumen: string;
+  venceEn: string | null;
+};
+
+/**
+ * Módulo de la agencia — la cotización vigente de la conversación (la última
+ * enviada, aceptada o vencida; la hiciera una persona o el agente). Sin ella,
+ * el agente leía el «sí» del cliente al PDF («para apartar, responde SÍ») como
+ * un sí a una cita (prueba del dueño, 2026-11-17).
+ */
+export async function cotizacionParaElAgente(
+  organizationId: string,
+  conversationId: string
+): Promise<CotizacionParaAgente | null> {
+  const lista = await listarCotizaciones(organizationId, { conversationId, limite: 10 });
+  const c = lista.find((x) => x.estado === "enviada" || x.estado === "aceptada" || x.estado === "vencida");
+  if (!c) return null;
+  return {
+    folio: c.folio,
+    estado: c.estado,
+    total: formatoDinero(c.totales.total, c.moneda),
+    anticipo: c.totales.anticipo > 0 && c.totales.anticipo < c.totales.total ? formatoDinero(c.totales.anticipo, c.moneda) : null,
+    resumen: c.partidas.map((p) => `${p.cantidad} × ${p.concepto}`).join(", "),
+    venceEn: c.venceEn,
   };
 }

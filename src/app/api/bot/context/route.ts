@@ -11,7 +11,7 @@ import { anuncioDelContacto } from "@/server/attribution/store";
 import { siguientesDelLead } from "@/server/bot/stage";
 import { archivosParaElAgente } from "@/server/biblioteca/agente";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
-import { vendedorParaElAgente } from "@/server/cotizaciones/vendedor";
+import { cotizacionParaElAgente, vendedorParaElAgente } from "@/server/cotizaciones/vendedor";
 
 export const dynamic = "force-dynamic";
 
@@ -134,6 +134,10 @@ export async function GET(req: Request) {
   const vendedor = cotizacionesEnabled()
     ? await vendedorParaElAgente(organizationId, conversation.id).catch(() => null)
     : null;
+  // Y la última cotización que ya le llegó, para que entienda su «sí».
+  const cotizacion = cotizacionesEnabled()
+    ? await cotizacionParaElAgente(organizationId, conversation.id).catch(() => null)
+    : null;
 
   return Response.json({
     contact: {
@@ -196,5 +200,11 @@ export async function GET(req: Request) {
      * con el vendedor apagado. Aditivo.
      */
     ...(vendedor ? { vendedor } : {}),
+    /**
+     * Módulo de la agencia — la última cotización enviada, aceptada o
+     * vencida de la conversación (folio, estado, total, anticipo). FALTA sin
+     * la bandera o sin cotizaciones enviadas. Aditivo.
+     */
+    ...(cotizacion ? { cotizacion } : {}),
   });
 }
