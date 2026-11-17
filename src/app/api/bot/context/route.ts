@@ -10,6 +10,8 @@ import { citasParaContexto } from "@/server/agenda/context";
 import { anuncioDelContacto } from "@/server/attribution/store";
 import { siguientesDelLead } from "@/server/bot/stage";
 import { archivosParaElAgente } from "@/server/biblioteca/agente";
+import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
+import { vendedorParaElAgente } from "@/server/cotizaciones/vendedor";
 
 export const dynamic = "force-dynamic";
 
@@ -127,6 +129,11 @@ export async function GET(req: Request) {
   // Módulo de la agencia: con BIBLIOTECA y la herramienta encendida, qué
   // fotos, videos y fichas puede mandar el agente. Si falla, no va.
   const biblioteca = await archivosParaElAgente(organizationId, conversation.id).catch(() => null);
+  // Módulo de la agencia: con COTIZACIONES y el vendedor encendido, el
+  // catálogo y lo que puede hacer al cotizar. Si falla, no va.
+  const vendedor = cotizacionesEnabled()
+    ? await vendedorParaElAgente(organizationId, conversation.id).catch(() => null)
+    : null;
 
   return Response.json({
     contact: {
@@ -183,5 +190,11 @@ export async function GET(req: Request) {
      * herramienta apagada o sin archivos activos. Aditivo.
      */
     ...(biblioteca && biblioteca.length > 0 ? { biblioteca } : {}),
+    /**
+     * Módulo de la agencia — el agente como vendedor: catálogo con precios y
+     * límites; cotiza con `POST /api/bot/cotizacion`. FALTA sin la bandera o
+     * con el vendedor apagado. Aditivo.
+     */
+    ...(vendedor ? { vendedor } : {}),
   });
 }

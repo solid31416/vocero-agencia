@@ -46,5 +46,8 @@ export const PUT = withAuth(async (session, req: Request) => {
   }
   const body = await parseBody(req, configSchema);
   if (!body.ok) return body.response;
-  return Response.json({ config: await guardarConfig(session.organizationId, configSchema.parse(body.data)) });
+  // El vendedor se guarda en su propia pantalla: aquí se conserva el guardado.
+  const actual = await leerConfig(session.organizationId);
+  const config = { ...configSchema.parse(body.data), vendedor: actual.vendedor };
+  return Response.json({ config: await guardarConfig(session.organizationId, config) });
 });

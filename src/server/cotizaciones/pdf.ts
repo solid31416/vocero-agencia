@@ -34,6 +34,8 @@ export type DatosPdf = {
   zona?: string;
   /** Módulo de la agencia: fotos de los modelos (JPG o PNG), hasta 3. */
   fotos?: { data: Buffer; mime: string; titulo: string }[];
+  /** Módulo de la agencia (vendedor): la mandó el agente solo; va debajo del total. */
+  leyenda?: string;
 };
 
 const ANCHO = 612; // carta, puntos
@@ -296,6 +298,16 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
     pagina.drawRectangle({ x: MARGEN, y: y - alto + 13, width: 3, height: alto, color: acento });
     rr.forEach((r, i) => texto(r, MARGEN + 14, y - i * 13, { f: negrita, t: 9.5, c: tinta }));
     y -= alto;
+  }
+
+  // Módulo de la agencia (vendedor): la que mandó el agente sin revisión lo dice.
+  const leyenda = (d.leyenda ?? "").trim();
+  if (leyenda) {
+    const rr = partirRenglones(leyenda, normal, 8, UTIL);
+    y -= 6;
+    asegurar(rr.length * 10 + 6);
+    rr.forEach((r, i) => texto(r, MARGEN, y - i * 10, { t: 8, c: gris }));
+    y -= rr.length * 10;
   }
 
   // ---------------------------------------------------------------- fotos

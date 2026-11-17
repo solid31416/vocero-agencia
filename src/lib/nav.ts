@@ -160,6 +160,7 @@ export function settingsSections({
   // Módulo de la agencia: todo lo de vender, junto, en «Ventas».
   const ventas: SettingsLink[] = [];
   if (cotizaciones) ventas.push({ href: "/settings/cotizaciones", label: "Cotizaciones" });
+  if (cotizaciones) ventas.push({ href: "/settings/vendedor", label: "Vendedor" });
   if (pedidos) ventas.push({ href: "/settings/pedidos", label: "Pedidos" });
   if (seguimiento) ventas.push({ href: "/settings/seguimiento", label: "Seguimiento" });
   if (biblioteca) ventas.push({ href: "/settings/biblioteca", label: "Biblioteca" });

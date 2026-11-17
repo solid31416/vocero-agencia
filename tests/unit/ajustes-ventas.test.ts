@@ -14,7 +14,7 @@ describe("Ajustes → Ventas", () => {
   it("con los módulos de venta: Ventas primero y Canales al final", () => {
     const s = settingsSections({ cotizaciones: true, pedidos: true, seguimiento: true, biblioteca: true, agenda: true });
     expect(s.map((x) => x.title)).toEqual(["Ventas", "Agente", "Negocio", "Canales"]);
-    expect(links(s).Ventas).toEqual(["Cotizaciones", "Pedidos", "Seguimiento", "Biblioteca", "Reporte semanal"]);
+    expect(links(s).Ventas).toEqual(["Cotizaciones", "Vendedor", "Pedidos", "Seguimiento", "Biblioteca", "Reporte semanal"]);
     expect(links(s).Agente).toEqual(["IA", "Agenda"]);
     expect(links(s).Negocio).not.toContain("Cotizaciones");
     expect(links(s).Negocio).not.toContain("Pedidos");

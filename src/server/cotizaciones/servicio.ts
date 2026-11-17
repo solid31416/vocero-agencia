@@ -17,7 +17,16 @@ import { getBranding } from "@/server/branding";
 import { SendError, sendMediaMessage } from "@/server/inbox/send";
 import { fotosParaCotizacion } from "./fotos";
 import { generarPdfCotizacion, nombreArchivo } from "./pdf";
-import { leerConfig, leerCotizacion, leerLogo, marcarEnviada } from "./store";
+import {
+  CREADA_POR_AGENTE,
+  leerConfig,
+  leerCotizacion,
+  leerLogo,
+  marcarEnviada,
+  marcarReemplazada,
+} from "./store";
+import { LEYENDA_POR_DEFECTO } from "@/lib/vendedor";
+import { guardarRespuestaDePrueba } from "@/server/lab/sandbox";
 import { montoAlTrato, moverACotizacion } from "./embudo";
 
 type Fila = NonNullable<Awaited<ReturnType<typeof leerCotizacion>>>;
@@ -53,6 +62,10 @@ export async function pdfDeCotizacion(organizationId: string, fila: Fila): Promi
     logo,
     zona,
     fotos,
+    // La que mandó el agente solo lleva la leyenda del vendedor.
+    ...(fila.enviadaPor === CREADA_POR_AGENTE
+      ? { leyenda: fila.condiciones.vendedor?.leyenda ?? LEYENDA_POR_DEFECTO }
+      : {}),
   });
   return { data, nombre: nombreArchivo(folio, fila.condiciones.negocio.nombre || branding.name) };
 }
@@ -65,7 +78,12 @@ export type ResultadoEnvio =
  * Envía la cotización por WhatsApp como documento, con el texto de Ajustes.
  * Solo un borrador; con «sin precio» sin llenar (precio 0) no sale.
  */
-export async function enviarCotizacion(organizationId: string, id: string): Promise<ResultadoEnvio> {
+export async function enviarCotizacion(
+  organizationId: string,
+  id: string,
+  /** Módulo de la agencia (vendedor): la manda el agente solo; `esPrueba` = Laboratorio. */
+  opciones: { porAgente?: boolean; esPrueba?: boolean } = {}
+): Promise<ResultadoEnvio> {
   const fila = await leerCotizacion(organizationId, id);
   if (!fila) return { ok: false, status: 404, codigo: "no_existe", detalle: "Cotización no encontrada" };
   if (fila.estado !== "borrador") {
@@ -82,18 +100,45 @@ export async function enviarCotizacion(organizationId: string, id: string): Prom
       detalle: "Hay partidas sin precio: llénalas antes de enviar",
     };
   }
-  // La vigencia corre desde el envío: el PDF ya lleva las fechas buenas.
+  // La vigencia corre desde el envío: el PDF ya lleva las fechas buenas. La
+  // que manda el agente solo usa la vigencia (más corta) del vendedor.
+  const porAgente = opciones.porAgente === true;
+  const vigenciaDias = porAgente
+    ? (fila.condiciones.vendedor?.vigenciaDias ?? fila.condiciones.vigenciaDias)
+    : fila.condiciones.vigenciaDias;
+  const enviadaPor = porAgente ? CREADA_POR_AGENTE : null;
   const ahora = new Date();
-  const venceEn = new Date(ahora.getTime() + fila.condiciones.vigenciaDias * 86_400_000);
-  const paraPdf: Fila = { ...fila, enviadaEn: ahora, venceEn };
+  const venceEn = new Date(ahora.getTime() + vigenciaDias * 86_400_000);
+  const paraPdf: Fila = { ...fila, enviadaEn: ahora, venceEn, enviadaPor };
   const { data, nombre } = await pdfDeCotizacion(organizationId, paraPdf);
   const zona = await businessTimezone(organizationId);
-  const caption = armarMensaje(fila.condiciones.mensaje, {
-    nombre: fila.contactoNombre,
-    folio: folioDe(fila.numero),
-    total: formatoDinero(fila.totales.total, fila.condiciones.moneda ?? "MXN"),
-    vigencia: fechaLarga(venceEn, zona),
-  }).slice(0, 1024);
+  // Una corrección lo dice al cliente, para que no se quede con la anterior.
+  const previa = fila.reemplazaA ? await leerCotizacion(organizationId, fila.reemplazaA) : null;
+  const anterior = previa && previa.conversationId === fila.conversationId ? previa : null;
+  const caption = (
+    (anterior ? `Te comparto la cotización corregida; reemplaza a la ${folioDe(anterior.numero)}.
+
+` : "") +
+    armarMensaje(fila.condiciones.mensaje, {
+      nombre: fila.contactoNombre,
+      folio: folioDe(fila.numero),
+      total: formatoDinero(fila.totales.total, fila.condiciones.moneda ?? "MXN"),
+      vigencia: fechaLarga(venceEn, zona),
+    })
+  ).slice(0, 1024);
+
+  // Laboratorio: no sale nada; queda en el hilo qué se habría mandado.
+  if (opciones.esPrueba) {
+    const g = await guardarRespuestaDePrueba({
+      organizationId,
+      conversationId: fila.conversationId,
+      text: `📎 [Cotización ${folioDe(fila.numero)} en PDF · ${formatoDinero(fila.totales.total, fila.condiciones.moneda ?? "MXN")}]
+${caption}`,
+    });
+    await marcarEnviada(organizationId, id, { messageId: g.messageId, vigenciaDias, enviadaPor });
+    if (anterior) await marcarReemplazada(organizationId, anterior.id);
+    return { ok: true, messageId: g.messageId };
+  }
 
   try {
     const r = await sendMediaMessage({
@@ -101,11 +146,11 @@ export async function enviarCotizacion(organizationId: string, id: string): Prom
       organizationId,
       file: { data, mimeType: "application/pdf", fileName: nombre },
       caption,
+      // Lo manda el agente: no cuenta como que una persona tomó la plática.
+      aiGenerated: porAgente,
     });
-    await marcarEnviada(organizationId, id, {
-      messageId: r.messageId,
-      vigenciaDias: fila.condiciones.vigenciaDias,
-    });
+    await marcarEnviada(organizationId, id, { messageId: r.messageId, vigenciaDias, enviadaPor });
+    if (anterior) await marcarReemplazada(organizationId, anterior.id);
     // El trato toma el total como monto si nadie le había puesto uno.
     await montoAlTrato({
       organizationId,

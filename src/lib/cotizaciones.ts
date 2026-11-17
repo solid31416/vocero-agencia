@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { VENDEDOR_POR_DEFECTO, vendedorSchema } from "./vendedor-config";
 
 /**
  * Módulo de la agencia (Treviño AI) — Cotización en PDF.
@@ -9,7 +10,7 @@ import { z } from "zod";
  * lo que escribió una persona), nunca de la IA.
  */
 
-export const ESTADOS_COTIZACION = ["borrador", "enviada", "aceptada", "rechazada", "vencida"] as const;
+export const ESTADOS_COTIZACION = ["borrador", "enviada", "aceptada", "rechazada", "vencida", "reemplazada"] as const;
 export type EstadoCotizacion = (typeof ESTADOS_COTIZACION)[number];
 
 export const ESTADO_INFO: Record<EstadoCotizacion, { etiqueta: string; color: string }> = {
@@ -18,6 +19,8 @@ export const ESTADO_INFO: Record<EstadoCotizacion, { etiqueta: string; color: st
   aceptada: { etiqueta: "Aceptada", color: "#30a46c" },
   rechazada: { etiqueta: "Rechazada", color: "#e5484d" },
   vencida: { etiqueta: "Vencida", color: "#d6a100" },
+  /** Módulo de la agencia: se corrigió con otra (p. ej. una que mandó el agente). */
+  reemplazada: { etiqueta: "Corregida", color: "#8b8d98" },
 };
 
 export const MAX_PRODUCTOS = 200;
@@ -145,6 +148,8 @@ export const configSchema = z.object({
   seguimiento: seguimientoCotSchema.default(SEGUIMIENTO_COT_POR_DEFECTO),
   /** Avisar cuando el cliente parece decir que sí a una cotización enviada. */
   detectarSi: z.boolean().default(true),
+  /** Módulo de la agencia: el agente como vendedor (Ajustes → Ventas → Vendedor). */
+  vendedor: vendedorSchema.default(VENDEDOR_POR_DEFECTO),
 });
 export type ConfigCotizaciones = z.infer<typeof configSchema>;
 export const CONFIG_POR_DEFECTO: ConfigCotizaciones = configSchema.parse({});
@@ -175,6 +180,8 @@ export const cotizacionInputSchema = z.object({
    * que suele ser el de su perfil de WhatsApp («J», un apodo, un emoji).
    */
   cliente: z.string().trim().max(MAX_CLIENTE).default(""),
+  /** Módulo de la agencia: corrige a esta cotización enviada (queda «reemplazada» al mandar). */
+  reemplazaA: z.string().trim().max(60).nullable().default(null),
 });
 export type CotizacionInput = z.infer<typeof cotizacionInputSchema>;
 
@@ -294,6 +301,12 @@ export type CotizacionDto = {
   seguimientoPausado: boolean;
   /** El cliente parece haber dicho que sí: lo que escribió y cuándo. */
   senal: { texto: string; en: string } | null;
+  /** Módulo de la agencia: la armó el agente (vendedor). */
+  deAgente: boolean;
+  /** La mandó el agente solo, sin que una persona la revisara. */
+  automatica: boolean;
+  /** Corrige a esta otra (su id), que quedó «reemplazada» al mandarse. */
+  reemplazaA: string | null;
 };
 
 /** Cómo va el seguimiento de una cotización enviada (para la tarjeta de la bandeja). */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, Copy, FileText, PartyPopper, Plus, Sparkles, Trash2 } from "lucide-react";
+import { BellRing, Bot, Copy, FileText, PartyPopper, Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ConversationDto } from "@/lib/types";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,8 @@ export function Cotizar({ conversation, onDone }: { conversation: ConversationDt
   // ¿El cliente parece haber dicho que sí a una cotización? Se revisa al
   // abrir la conversación y cada vez que llega un mensaje.
   const [senal, setSenal] = useState<CotizacionDto | null>(null);
+  // Módulo de la agencia (vendedor): el agente dejó una lista para revisar.
+  const [porAprobar, setPorAprobar] = useState<CotizacionDto | null>(null);
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let vivo = true;
@@ -81,6 +83,7 @@ export function Cotizar({ conversation, onDone }: { conversation: ConversationDt
       const d = (await res.json().catch(() => null)) as { cotizaciones?: CotizacionDto[] } | null;
       if (!vivo) return;
       setSenal(d?.cotizaciones?.find((c) => c.senal && sePuedeAceptar(c.estado)) ?? null);
+      setPorAprobar(d?.cotizaciones?.find((c) => c.estado === "borrador" && c.deAgente) ?? null);
     })();
     return () => {
       vivo = false;
@@ -92,23 +95,40 @@ export function Cotizar({ conversation, onDone }: { conversation: ConversationDt
       <button
         type="button"
         onClick={() => setAbierto(true)}
-        aria-label={senal ? `El cliente parece aceptar la cotización ${senal.folio}` : "Hacer una cotización para este cliente"}
-        title={senal ? `El cliente parece aceptar la cotización ${senal.folio}` : "Hacer una cotización para este cliente"}
+        aria-label={
+          porAprobar
+            ? `El agente preparó la cotización ${porAprobar.folio}: revísala`
+            : senal
+              ? `El cliente parece aceptar la cotización ${senal.folio}`
+              : "Hacer una cotización para este cliente"
+        }
+        title={
+          porAprobar
+            ? `El agente preparó la cotización ${porAprobar.folio}: revísala`
+            : senal
+              ? `El cliente parece aceptar la cotización ${senal.folio}`
+              : "Hacer una cotización para este cliente"
+        }
         className={cn(
           "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium leading-5 transition-colors",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          senal
-            ? "border-success-text/40 bg-success-tint text-success-text"
-            : "border-border-strong text-text-2 hover:border-text-3 hover:text-foreground"
+          porAprobar
+            ? "border-brand/40 bg-brand-tint text-brand-text"
+            : senal
+              ? "border-success-text/40 bg-success-tint text-success-text"
+              : "border-border-strong text-text-2 hover:border-text-3 hover:text-foreground"
         )}
         data-senal={senal ? senal.folio : undefined}
+        data-por-aprobar={porAprobar ? porAprobar.folio : undefined}
       >
-        {senal ? (
+        {porAprobar ? (
+          <Bot className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
+        ) : senal ? (
           <PartyPopper className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
         ) : (
           <FileText className="h-3.5 w-3.5" strokeWidth={1.8} aria-hidden />
         )}
-        <span>{senal ? "¿Aceptó?" : "Cotizar"}</span>
+        <span>{porAprobar ? "Revisar cotización" : senal ? "¿Aceptó?" : "Cotizar"}</span>
       </button>
       {abierto && (
         <VentanaCotizar
@@ -147,6 +167,10 @@ function VentanaCotizar({
   const [cliente, setCliente] = useState(conversation.contact.name);
   const nombreInicial = useRef(conversation.contact.name);
   const [borradorId, setBorradorId] = useState<string | null>(null);
+  // Módulo de la agencia (vendedor): el borrador lo armó el agente, o esta
+  // corrige a una que ya se mandó.
+  const [deAgente, setDeAgente] = useState(false);
+  const [corrige, setCorrige] = useState<{ id: string; folio: string } | null>(null);
   // Si el cliente ya tiene cotizaciones (y no hay borrador), primero se ven
   // ellas con sus datos; el formulario en blanco es solo para hacer otra.
   const [armando, setArmando] = useState(true);
@@ -172,6 +196,9 @@ function VentanaCotizar({
         setDescuentoPct(borrador.descuentoPct);
         setNotas(borrador.notas);
         setCliente(borrador.contactoNombre);
+        setDeAgente(borrador.deAgente);
+        const previa = borrador.reemplazaA ? d.cotizaciones.find((c) => c.id === borrador.reemplazaA) : null;
+        setCorrige(previa ? { id: previa.id, folio: previa.folio } : null);
       }
     })();
   }, [conversation.id]);
@@ -254,6 +281,7 @@ function VentanaCotizar({
         descuentoPct,
         notas,
         cliente: cliente.trim(),
+        reemplazaA: corrige?.id ?? null,
       }),
     }).catch(() => null);
     const d = (await res?.json().catch(() => null)) as
@@ -295,13 +323,19 @@ function VentanaCotizar({
 
   const anteriores = (datos?.cotizaciones ?? []).filter((c) => c.estado !== "borrador");
 
-  /** Arma una nueva a partir de una que ya se mandó (mismas partidas, notas y nombre). */
-  function copiar(c: CotizacionDto) {
+  /**
+   * Arma una nueva a partir de una que ya se mandó (mismas partidas, notas y
+   * nombre). Con `corregir`, la nueva la reemplaza: al mandarla, la anterior
+   * queda «Corregida» y el cliente recibe el aviso.
+   */
+  function copiar(c: CotizacionDto, corregir = false) {
     setPartidas(c.partidas.map((p) => ({ ...p })));
     setDescuentoPct(c.descuentoPct);
     setNotas(c.notas);
     setCliente(c.contactoNombre);
     setBorradorId(null);
+    setDeAgente(false);
+    setCorrige(corregir ? { id: c.id, folio: c.folio } : null);
     setAviso(null);
     setArmando(true);
   }
@@ -312,6 +346,8 @@ function VentanaCotizar({
     setNotas("");
     setCliente(datos?.aNombreDe || conversation.contact.name);
     setBorradorId(null);
+    setDeAgente(false);
+    setCorrige(null);
     setAviso(null);
     setArmando(true);
   }
@@ -341,6 +377,17 @@ function VentanaCotizar({
                 ? "Los precios salen de tu lista (Ajustes → Cotizaciones). Puedes cambiarlos aquí."
                 : "Lo que ya le mandaste. Márcala aceptada cuando te diga que sí, o haz otra."}
             </p>
+            {armando && deAgente && (
+              <p className="mt-2 rounded-md bg-brand-tint px-2.5 py-1.5 text-sm text-brand-text" data-de-agente>
+                🤖 La preparó el agente con los precios de tu lista. Revísala y dale «Enviar por WhatsApp».
+              </p>
+            )}
+            {armando && corrige && (
+              <p className="mt-2 rounded-md bg-warning-tint px-2.5 py-1.5 text-sm text-warning-text" data-corrige>
+                Corrige a la {corrige.folio}: al enviarla, esa queda como «Corregida» y el cliente recibe la nueva
+                con el aviso.
+              </p>
+            )}
           </div>
           {armando && (
             <Button type="button" variant="outline" size="sm" onClick={() => void llenarConIa()} disabled={!datos || ocupado !== null}>
@@ -363,6 +410,7 @@ function VentanaCotizar({
                   pedidoFolio={datos.pedidoDeCotizacion?.[c.id] ?? null}
                   seguimiento={datos.seguimientos?.[c.id] ?? null}
                   onCopiar={() => copiar(c)}
+                  onCorregir={() => copiar(c, true)}
                   onListo={(texto, ok) => {
                     setAviso({ ok, texto });
                     void recargarLista();
@@ -623,6 +671,7 @@ function TarjetaCotizacion({
   pedidoFolio,
   seguimiento,
   onCopiar,
+  onCorregir,
   onListo,
 }: {
   cotizacion: CotizacionDto;
@@ -630,6 +679,7 @@ function TarjetaCotizacion({
   pedidoFolio: string | null;
   seguimiento: SeguimientoCotDto | null;
   onCopiar: () => void;
+  onCorregir: () => void;
   onListo: (texto: string, ok: boolean) => void;
 }) {
   const [ocupado, setOcupado] = useState(false);
@@ -664,7 +714,10 @@ function TarjetaCotizacion({
         <span className="text-xs text-text-3">{fecha}</span>
         <span className="ml-auto font-bold">{formatoDinero(c.totales.total, c.moneda)}</span>
       </div>
-      <p className="text-xs text-text-3">A nombre de {c.contactoNombre}</p>
+      <p className="text-xs text-text-3">
+        A nombre de {c.contactoNombre}
+        {c.automatica ? " · 🤖 la mandó el agente" : c.deAgente ? " · 🤖 la preparó el agente" : ""}
+      </p>
       <ul className="space-y-0.5">
         {c.partidas.map((p, i) => (
           <li key={i} className="flex justify-between gap-3">
@@ -720,6 +773,16 @@ function TarjetaCotizacion({
         >
           <Copy className="h-3.5 w-3.5" aria-hidden /> Hacer otra a partir de esta
         </button>
+        {(c.estado === "enviada" || c.estado === "vencida") && (
+          <button
+            type="button"
+            onClick={onCorregir}
+            className="inline-flex items-center gap-1 text-xs font-medium text-warning-text hover:underline"
+            data-corregir={c.folio}
+          >
+            <Pencil className="h-3.5 w-3.5" aria-hidden /> Corregir
+          </button>
+        )}
         <span className="ml-auto">
           <AceptarCotizacion
             cotizacion={c}

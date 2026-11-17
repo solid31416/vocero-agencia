@@ -20,12 +20,14 @@ import { EstadoChip } from "@/components/settings/cotizaciones-client";
 type Datos = { cotizaciones: CotizacionDto[]; pedidoDeCotizacion: Record<string, string> };
 
 /** «senal» = el cliente parece haber dicho que sí y nadie la ha marcado. */
-type Filtro = CotizacionDto["estado"] | "senal";
+type Filtro = CotizacionDto["estado"] | "senal" | "por_aprobar";
 
-const ORDEN: CotizacionDto["estado"][] = ["enviada", "aceptada", "rechazada", "vencida", "borrador"];
+const ORDEN: CotizacionDto["estado"][] = ["enviada", "aceptada", "rechazada", "vencida", "borrador", "reemplazada"];
 
 const abierta = (c: CotizacionDto) => c.estado === "enviada" || c.estado === "vencida";
 const conSenal = (c: CotizacionDto) => Boolean(c.senal) && abierta(c);
+/** Módulo de la agencia (vendedor): la preparó el agente y espera a una persona. */
+const porAprobar = (c: CotizacionDto) => c.estado === "borrador" && c.deAgente;
 
 export function CotizacionesLista() {
   const [datos, setDatos] = useState<Datos | null>(null);
@@ -49,7 +51,8 @@ export function CotizacionesLista() {
     if (!datos) return [];
     const texto = q.trim().toLowerCase();
     return datos.cotizaciones.filter((c) => {
-      if (filtro === "senal" ? !conSenal(c) : filtro && c.estado !== filtro) return false;
+      if (filtro === "senal" ? !conSenal(c) : filtro === "por_aprobar" ? !porAprobar(c) : filtro && c.estado !== filtro)
+        return false;
       if (!texto) return true;
       const conceptos = c.partidas.map((p) => p.concepto).join(" ");
       return `${c.folio} ${c.contactoNombre} ${conceptos}`.toLowerCase().includes(texto);
@@ -80,6 +83,7 @@ export function CotizacionesLista() {
   }
 
   const senales = datos?.cotizaciones.filter(conSenal).length ?? 0;
+  const pendientes = datos?.cotizaciones.filter(porAprobar).length ?? 0;
 
   return (
     <div className="flex h-full flex-col">
@@ -99,6 +103,15 @@ export function CotizacionesLista() {
           <>
             <div className="flex flex-wrap gap-2">
               <Chip activo={!filtro} onClick={() => setFiltro(null)} texto="Todas" n={datos.cotizaciones.length} />
+              {pendientes > 0 && (
+                <Chip
+                  activo={filtro === "por_aprobar"}
+                  onClick={() => setFiltro(filtro === "por_aprobar" ? null : "por_aprobar")}
+                  texto="🤖 Por aprobar"
+                  n={pendientes}
+                  resaltar
+                />
+              )}
               {senales > 0 && (
                 <Chip
                   activo={filtro === "senal"}
@@ -165,6 +178,11 @@ export function CotizacionesLista() {
                         </a>
                         <span className="block">
                           <EstadoChip estado={c.estado} />
+                          {c.deAgente && (
+                            <span className="ml-1 text-xs" title={c.automatica ? "La mandó el agente" : "La preparó el agente"}>
+                              🤖
+                            </span>
+                          )}
                         </span>
                       </span>
                       <span className="text-right text-sm font-semibold sm:order-3 sm:text-right">

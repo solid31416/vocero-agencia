@@ -97,6 +97,130 @@
         "x-codigos-409": ["ai_paused", "herramienta_apagada", "etapa_no_permitida", "no_org"]
       }
     },
+    "/api/bot/cotizacion": {
+      "post": {
+        "summary": "Armar una cotización como vendedor (módulo de la agencia)",
+        "description": "Solo con la bandera `COTIZACIONES` (sin ella, 404 vacío) y con el vendedor encendido (Ajustes → Ventas → Vendedor; el contexto trae `vendedor`). El cerebro manda SOLO `productoId` del catálogo y cantidades: el precio y los totales los pone el CRM. Según el modo, queda para que una persona la mande (`estado: por_aprobar`) o sale el PDF solo (`enviada`, con la leyenda y la vigencia del vendedor). Siempre deja una nota interna. En el Laboratorio no sale nada. Máximo 5 por conversación en 24 h.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "conversationId",
+                  "items"
+                ],
+                "properties": {
+                  "conversationId": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "productoId",
+                        "cantidad"
+                      ],
+                      "properties": {
+                        "productoId": {
+                          "type": "string"
+                        },
+                        "cantidad": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      }
+                    }
+                  },
+                  "cliente": {
+                    "type": "string",
+                    "description": "A nombre de quién (persona o empresa). Vacío = el nombre del contacto."
+                  },
+                  "descuentoPct": {
+                    "type": "number",
+                    "minimum": 0,
+                    "description": "Solo si el vendedor puede dar descuento, hasta su máximo."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Armada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "estado",
+                    "folio",
+                    "total",
+                    "anticipo",
+                    "resumen"
+                  ],
+                  "properties": {
+                    "estado": {
+                      "enum": [
+                        "enviada",
+                        "por_aprobar"
+                      ]
+                    },
+                    "folio": {
+                      "type": "string"
+                    },
+                    "total": {
+                      "type": "string"
+                    },
+                    "anticipo": {
+                      "type": "string"
+                    },
+                    "resumen": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "`not_found` (conversación).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Lleva `paraPersona`. Con `true` (`vendedor_apagado`, `tope`, `cantidad_maxima`, `sin_precio`, `limite`, `window_closed`…) el agente avisa que sigue un asesor y escala; `ai_paused` si una persona tomó la plática; `persona_armando` (`paraPersona: false`) si alguien del equipo ya la está haciendo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "`paraPersona: false`: `producto_desconocido`, `extras_apagados`, `descuento_no_permitido`, `descuento_alto`. El agente corrige su pedido o le explica al cliente.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/bot/biblioteca": {
       "post": {
         "summary": "Mandar un archivo de la Biblioteca (módulo de la agencia)",

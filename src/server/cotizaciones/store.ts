@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, sql } from "drizzle-orm";
 import { boolean, integer, jsonb, numeric, pgTable, text, timestamp } from "drizzle-orm/pg-core";
 import { customAlphabet } from "nanoid";
 import { getDb, schema } from "@/lib/db";
@@ -63,7 +63,14 @@ export const cotizacion = pgTable("agencia_cotizacion", {
   senalEn: timestamp("senal_en"),
   /** Hasta qué mensaje del cliente ya se revisó buscando el «sí». */
   senalRevisadaHasta: timestamp("senal_revisada_hasta"),
+  /** Módulo de la agencia (vendedor): «agente» si la mandó el agente solo. */
+  enviadaPor: text("enviada_por"),
+  /** Corrige a esta cotización (que queda «reemplazada» al mandar esta). */
+  reemplazaA: text("reemplaza_a"),
 });
+
+/** Quien arma la cotización cuando es el agente (en `creada_por`). */
+export const CREADA_POR_AGENTE = "agente";
 
 /** Los recordatorios que salieron (o se intentaron) por cotización: uno de cada tipo. */
 export const cotizacionToque = pgTable("agencia_cotizacion_toque", {
@@ -131,6 +138,9 @@ async function crear(): Promise<void> {
   await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_texto text`);
   await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_en timestamp`);
   await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS senal_revisada_hasta timestamp`);
+  // El agente como vendedor y las correcciones (2026-11-17): aditivo.
+  await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS enviada_por text`);
+  await db.execute(sql`ALTER TABLE agencia_cotizacion ADD COLUMN IF NOT EXISTS reemplaza_a text`);
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS agencia_cotizacion_toque (
       id text PRIMARY KEY,
@@ -209,6 +219,9 @@ export function aDto(f: Fila, ahora = new Date()): CotizacionDto {
     createdAt: f.createdAt.toISOString(),
     seguimientoPausado: Boolean(f.seguimientoPausado),
     senal: f.senalTexto && f.senalEn ? { texto: f.senalTexto, en: f.senalEn.toISOString() } : null,
+    deAgente: f.creadaPor === CREADA_POR_AGENTE,
+    automatica: f.enviadaPor === CREADA_POR_AGENTE,
+    reemplazaA: f.reemplazaA ?? null,
   };
 }
 
@@ -305,6 +318,7 @@ export async function guardarBorrador(input: {
     notas: input.datos.notas,
     totales,
     condiciones: condicionesDe(config),
+    reemplazaA: input.datos.reemplazaA ?? null,
     updatedAt: new Date(),
   };
   const db = getDb();
@@ -353,7 +367,7 @@ export async function guardarBorrador(input: {
 export async function marcarEnviada(
   organizationId: string,
   id: string,
-  datos: { messageId: string | null; vigenciaDias: number }
+  datos: { messageId: string | null; vigenciaDias: number; enviadaPor?: string | null }
 ): Promise<void> {
   const ahora = new Date();
   await getDb()
@@ -363,9 +377,68 @@ export async function marcarEnviada(
       enviadaEn: ahora,
       venceEn: new Date(ahora.getTime() + datos.vigenciaDias * 24 * 60 * 60 * 1000),
       messageId: datos.messageId,
+      enviadaPor: datos.enviadaPor ?? null,
       updatedAt: ahora,
     })
     .where(scoped(cotizacion.organizationId, organizationId, eq(cotizacion.id, id)));
+}
+
+/**
+ * Módulo de la agencia — una cotización enviada que se corrigió con otra:
+ * queda «reemplazada» y sin seguimiento (ya no se le recuerda al cliente).
+ */
+export async function marcarReemplazada(organizationId: string, id: string): Promise<void> {
+  await getDb()
+    .update(cotizacion)
+    .set({ estado: "reemplazada", seguimientoPausado: true, updatedAt: new Date() })
+    .where(
+      scoped(
+        cotizacion.organizationId,
+        organizationId,
+        and(eq(cotizacion.id, id), sql`${cotizacion.estado} IN ('enviada', 'aceptada', 'rechazada')`)
+      )
+    );
+}
+
+/** El borrador de una conversación, si hay (la bandeja retoma uno a la vez). */
+export async function borradorDeConversacion(organizationId: string, conversationId: string): Promise<Fila | null> {
+  await asegurarTablas();
+  const [f] = await getDb()
+    .select()
+    .from(cotizacion)
+    .where(
+      scoped(
+        cotizacion.organizationId,
+        organizationId,
+        and(eq(cotizacion.conversationId, conversationId), eq(cotizacion.estado, "borrador"))
+      )
+    )
+    .orderBy(desc(cotizacion.createdAt))
+    .limit(1);
+  return f ?? null;
+}
+
+/** Cuántas cotizaciones armó el agente en esta conversación desde `desde`. */
+export async function cotizacionesDelAgenteDesde(
+  organizationId: string,
+  conversationId: string,
+  desde: Date
+): Promise<number> {
+  const [r] = await getDb()
+    .select({ n: sql<number>`count(*)` })
+    .from(cotizacion)
+    .where(
+      scoped(
+        cotizacion.organizationId,
+        organizationId,
+        and(
+          eq(cotizacion.conversationId, conversationId),
+          eq(cotizacion.creadaPor, CREADA_POR_AGENTE),
+          gte(cotizacion.createdAt, desde)
+        )
+      )
+    );
+  return Number(r?.n ?? 0);
 }
 
 export async function cambiarEstado(

@@ -121,3 +121,26 @@ export async function borrarNota(quien: Quien, conversationId: string, noteId: s
     .where(scoped(schema.conversationNote.organizationId, quien.organizationId, eq(schema.conversationNote.id, noteId)));
   publish(quien.organizationId, { type: "note.deleted", data: { conversationId, noteId } });
 }
+
+/**
+ * Módulo de la agencia — una nota que deja el sistema (p. ej. «el agente
+ * preparó una cotización»): sin autor, visible para todo el equipo.
+ */
+export async function crearNotaDelSistema(
+  organizationId: string,
+  conversationId: string,
+  texto: string
+): Promise<void> {
+  const [fila] = await getDb()
+    .insert(schema.conversationNote)
+    .values({
+      id: newId("conversationNote"),
+      organizationId,
+      conversationId,
+      authorUserId: null,
+      texto: texto.slice(0, NOTA_MAX),
+    })
+    .returning();
+  const dto = aDto(fila!, null, { organizationId, userId: "", configura: false });
+  publish(organizationId, { type: "note.new", data: { conversationId, note: dto } });
+}
