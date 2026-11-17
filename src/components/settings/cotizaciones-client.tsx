@@ -21,6 +21,7 @@ import {
   type Producto,
 } from "@/lib/cotizaciones";
 import { pedirAceptar, textoDeAceptada } from "@/components/cotizaciones/aceptar-cotizacion";
+import { FormasDePago } from "@/components/settings/formas-de-pago";
 
 /**
  * Módulo de la agencia (Treviño AI) — Ajustes → Cotizaciones.
@@ -89,6 +90,8 @@ export function CotizacionesClient() {
         ...config,
         // Un producto a medio escribir (sin nombre) no tumba el guardado: se ignora.
         productos: config!.productos.filter((p) => p.nombre.trim()),
+        // Igual con una forma de pago sin nombre.
+        metodosPago: config!.metodosPago.filter((m) => m.nombre.trim()),
       }),
     }).catch(() => null);
     setGuardando(false);
@@ -364,9 +367,12 @@ export function CotizacionesClient() {
                 <span className="text-sm">Mis precios ya incluyen IVA</span>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="cot-pago">Forma de pago</Label>
+                <Label htmlFor="cot-pago">Forma de pago (resumen)</Label>
                 <Input id="cot-pago" value={config.formaPago} maxLength={300} disabled={!editable}
                   onChange={(e) => cambiar({ formaPago: e.target.value })} />
+                <p className="text-xs text-muted-foreground">
+                  Una línea general. Las cuentas, CLABE y demás datos van abajo, en «Formas de pago».
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cot-condiciones">Otras condiciones (salen al final del PDF)</Label>
@@ -384,6 +390,8 @@ export function CotizacionesClient() {
                 </p>
               </div>
             </section>
+            <FormasDePago metodos={config.metodosPago} editable={editable}
+              onChange={(metodosPago) => cambiar({ metodosPago })} />
             {botonGuardar}
           </>
         )}

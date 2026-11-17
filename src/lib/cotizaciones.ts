@@ -42,6 +42,40 @@ export const productoSchema = z.object({
 });
 export type Producto = z.infer<typeof productoSchema>;
 
+/**
+ * Módulo de la agencia — una forma de pago o abono que acepta el negocio
+ * (Ajustes → Cotizaciones → Condiciones). Todo a mano; sale en el PDF en
+ * «Cómo pagar». Solo el nombre es obligatorio.
+ */
+export const MAX_METODOS_PAGO = 6;
+export const metodoPagoSchema = z.object({
+  id: z.string().trim().min(1).max(40),
+  nombre: z.string().trim().min(1, "Ponle nombre a la forma de pago (p. ej. «Transferencia BBVA»)").max(60),
+  banco: z.string().trim().max(60).default(""),
+  titular: z.string().trim().max(120).default(""),
+  clabe: z
+    .string()
+    .transform((s) => s.replace(/\s+/g, ""))
+    .pipe(z.string().regex(/^(\d{18})?$/, "La CLABE lleva 18 números"))
+    .default(""),
+  cuenta: z.string().trim().max(40).default(""),
+  tarjeta: z.string().trim().max(25).default(""),
+  notas: z.string().trim().max(300).default(""),
+});
+export type MetodoPago = z.infer<typeof metodoPagoSchema>;
+
+/** Los renglones de «Cómo pagar» de una forma de pago (lo vacío no sale). */
+export function renglonesDePago(m: MetodoPago): string[] {
+  const r: string[] = [];
+  if (m.banco) r.push(`Banco: ${m.banco}`);
+  if (m.titular) r.push(`A nombre de: ${m.titular}`);
+  if (m.clabe) r.push(`CLABE: ${m.clabe}`);
+  if (m.cuenta) r.push(`Cuenta: ${m.cuenta}`);
+  if (m.tarjeta) r.push(`Tarjeta: ${m.tarjeta}`);
+  if (m.notas) r.push(m.notas);
+  return r;
+}
+
 export const negocioSchema = z.object({
   nombre: z.string().trim().max(120).default(""),
   rfc: z.string().trim().max(20).default(""),
@@ -85,6 +119,8 @@ export const configSchema = z.object({
   preciosConIva: z.boolean().default(false),
   anticipoPct: z.coerce.number().min(0).max(100).default(50),
   formaPago: z.string().trim().max(300).default("Transferencia o depósito bancario."),
+  /** Módulo de la agencia: las cuentas y formas de abono, para «Cómo pagar» del PDF. */
+  metodosPago: z.array(metodoPagoSchema).max(MAX_METODOS_PAGO, `Máximo ${MAX_METODOS_PAGO} formas de pago`).default([]),
   condiciones: z.string().trim().max(1500).default(""),
   /** El texto que acompaña al PDF en WhatsApp. {nombre} {folio} {total} {vigencia}. */
   mensaje: z.string().trim().min(1).max(600).default(MENSAJE_POR_DEFECTO),

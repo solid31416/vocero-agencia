@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFP
 import {
   fechaLarga,
   formatoDinero,
+  renglonesDePago,
   type ConfigCotizaciones,
   type Partida,
   type Totales,
@@ -268,6 +269,29 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
       texto(etiq, xEtiq, y, { t: 9, c: gris });
       texto(valor, xEtiq, y, { t: 9.5, alinear: "der", ancho: 224 });
       y -= 16;
+    }
+  }
+
+  // ---------------------------------------------------------------- cómo pagar
+  // Módulo de la agencia: las formas de pago de Ajustes, cada una con sus
+  // datos. Las cotizaciones guardadas antes de existir no traen la lista.
+  const metodos = d.condiciones.metodosPago ?? [];
+  if (metodos.length > 0) {
+    y -= 12;
+    asegurar(40);
+    texto("Cómo pagar", MARGEN, y, { f: negrita, t: 10, c: acento });
+    y -= 16;
+    for (const m of metodos) {
+      const renglones = renglonesDePago(m).flatMap((r) => partirRenglones(r, normal, 8.5, UTIL - 12));
+      asegurar(16 + renglones.length * 11.5);
+      pagina.drawRectangle({ x: MARGEN, y: y - renglones.length * 11.5 - 4, width: 2, height: 14 + renglones.length * 11.5, color: acento });
+      texto(m.nombre, MARGEN + 10, y, { f: negrita, t: 9.5, c: tinta });
+      y -= 13;
+      for (const r of renglones) {
+        texto(r, MARGEN + 10, y, { t: 8.5, c: gris });
+        y -= 11.5;
+      }
+      y -= 8;
     }
   }
 
