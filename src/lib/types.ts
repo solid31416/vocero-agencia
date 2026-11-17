@@ -158,22 +158,47 @@ export type ContactDto = {
 
 /** Por qué se perdió un trato. Lista corta a propósito: una taxonomía larga
  *  se responde "otro" y deja de informar. */
-export type LossReason =
-  | "precio"
-  | "no_es_perfil"
-  | "sin_presupuesto"
-  | "eligio_otro"
-  | "nunca_contesto"
-  | "otro";
+export const LOSS_REASONS = [
+  "precio",
+  "no_es_perfil",
+  "sin_presupuesto",
+  "eligio_otro",
+  "nunca_contesto",
+  "otro",
+  // Módulo de la agencia — venta consultiva de piezas grandes con envío.
+  "flete_caro",
+  "terreno_no_listo",
+  "solo_cotizaba",
+] as const;
+
+export type LossReason = (typeof LOSS_REASONS)[number];
 
 export const LOSS_REASON_LABEL: Record<LossReason, string> = {
   precio: "Le pareció caro",
   no_es_perfil: "No era el perfil",
   sin_presupuesto: "Sin presupuesto ahora",
-  eligio_otro: "Se fue con otro",
-  nunca_contesto: "Nunca contestó",
+  eligio_otro: "Compró con otro",
+  nunca_contesto: "Dejó de contestar",
   otro: "Otro",
+  flete_caro: "El flete le salió caro",
+  terreno_no_listo: "Su terreno o proyecto no está listo",
+  solo_cotizaba: "Solo estaba cotizando",
 };
+
+/**
+ * Módulo de la agencia — los que se ofrecen al marcar «Perdido», en este
+ * orden. «No era el perfil» y «Sin presupuesto» siguen valiendo (historial,
+ * API) pero no se ofrecen: para este negocio los cubren los de aquí.
+ */
+export const LOSS_REASONS_A_ELEGIR: readonly LossReason[] = [
+  "precio",
+  "flete_caro",
+  "terreno_no_listo",
+  "solo_cotizaba",
+  "nunca_contesto",
+  "eligio_otro",
+  "otro",
+];
 
 /** Quién provocó un movimiento de etapa. */
 export type StageChangeSource = "dueno" | "bot" | "sistema" | "migracion";

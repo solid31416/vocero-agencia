@@ -6,6 +6,7 @@ import { scoped } from "@/lib/db/tenant";
 import { publish } from "@/server/events/bus";
 import { moveLeadToStage } from "@/server/leads/stage-history";
 import { getBranding } from "@/server/branding";
+import { LOSS_REASONS } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,16 +26,7 @@ const patchSchema = z.object({
    * puerta: la regla es del dominio, no de esta ruta, y hay más caminos que
    * mueven tarjetas.
    */
-  lossReason: z
-    .enum([
-      "precio",
-      "no_es_perfil",
-      "sin_presupuesto",
-      "eligio_otro",
-      "nunca_contesto",
-      "otro",
-    ])
-    .optional(),
+  lossReason: z.enum(LOSS_REASONS).optional(),
   lossNote: z.string().max(500).optional(),
   /**
    * Monto en centavos enteros. `null` explícito lo borra; ausente lo deja como

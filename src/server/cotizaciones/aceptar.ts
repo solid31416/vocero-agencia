@@ -5,7 +5,7 @@ import { listarPedidos, type FilaPedido } from "@/server/pedidos/store";
 import { termometroEnabled } from "@/server/termometro/flag";
 import { guardarClasificacion, mapa } from "@/server/termometro/store";
 import { aDto, cambiarEstado, leerCotizacion } from "./store";
-import { montoAlTrato } from "./embudo";
+import { montoAlTrato, moverAAceptada } from "./embudo";
 
 /**
  * Módulo de la agencia — el cliente dijo que sí a una cotización.
@@ -65,6 +65,13 @@ export async function aceptarCotizacion(input: {
     total: input.monto ?? cotizacion.totales.total,
     moneda: cotizacion.moneda,
     soloSiVacio: false,
+  });
+  // Y pasa a «Cotización aceptada»: aceptó y falta el anticipo.
+  await moverAAceptada({
+    organizationId,
+    contactId: fila.contactId,
+    conversationId: fila.conversationId,
+    actorUserId: input.userId,
   });
 
   // El termómetro: quien acepta una cotización está caliente. Se respetan sus etiquetas.

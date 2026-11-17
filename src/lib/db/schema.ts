@@ -327,6 +327,10 @@ export const leadStageEvent = pgTable(
         "eligio_otro",
         "nunca_contesto",
         "otro",
+        // Módulo de la agencia (texto libre en la base: sin migración).
+        "flete_caro",
+        "terreno_no_listo",
+        "solo_cotizaba",
       ],
     }),
     lossNote: text("loss_note"),

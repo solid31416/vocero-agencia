@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { settingsInicio, settingsSections } from "@/lib/nav";
-import { esEtapaDeCotizacion, etapaDeCotizacion, productoSchema } from "@/lib/cotizaciones";
+import { esEtapaDeAceptada, esEtapaDeCotizacion, etapaDeAceptada, etapaDeCotizacion, productoSchema } from "@/lib/cotizaciones";
+import { etapaDeAnticipo } from "@/lib/pedidos";
+import { esEtapaDeVisita } from "@/lib/agenda-etapa";
+import { LOSS_REASONS, LOSS_REASONS_A_ELEGIR, LOSS_REASON_LABEL } from "@/lib/types";
 
 /**
  * Módulo de la agencia — Ajustes con una sección «Ventas» que abre primero,
@@ -58,5 +61,42 @@ describe("la etapa de cotización enviada", () => {
     expect(etapaDeCotizacion(etapas)?.name).toBe("Cotización enviada");
     expect(etapaDeCotizacion([{ name: "Cotización enviada", kind: "won" }])).toBeNull();
     expect(etapaDeCotizacion([{ name: "Nuevo", kind: "open" }])).toBeNull();
+  });
+});
+
+describe("Módulo de la agencia — etapa de cotización aceptada", () => {
+  const etapas = [
+    { name: "Nuevo", kind: "open" },
+    { name: "Calificado", kind: "open" },
+    { name: "Cita por videollamada", kind: "open" },
+    { name: "Cotización enviada", kind: "open" },
+    { name: "Cotización aceptada", kind: "open" },
+    { name: "Anticipo pagado", kind: "won" },
+    { name: "Perdido", kind: "lost" },
+  ];
+
+  it("reconoce la etapa de aceptada y no la confunde con la de enviada", () => {
+    expect(esEtapaDeAceptada("Cotización aceptada")).toBe(true);
+    expect(esEtapaDeAceptada("ACEPTÓ")).toBe(true);
+    expect(esEtapaDeAceptada("Anticipo aceptado")).toBe(false);
+    expect(esEtapaDeAceptada("Cotización enviada")).toBe(false);
+    expect(etapaDeAceptada(etapas)?.name).toBe("Cotización aceptada");
+    expect(etapaDeCotizacion(etapas)?.name).toBe("Cotización enviada");
+    // Aunque estuvieran al revés, «enviada» nunca es la de aceptada.
+    expect(etapaDeCotizacion([...etapas].reverse())?.name).toBe("Cotización enviada");
+    expect(etapaDeAceptada([{ name: "Nuevo", kind: "open" }])).toBeNull();
+  });
+
+  it("el pago y la agenda siguen eligiendo su etapa", () => {
+    expect(etapaDeAnticipo(etapas)?.name).toBe("Anticipo pagado");
+    expect(esEtapaDeVisita("Cita por videollamada")).toBe(true);
+  });
+
+  it("los motivos de pérdida que se ofrecen tienen etiqueta y son válidos", () => {
+    for (const r of LOSS_REASONS_A_ELEGIR) {
+      expect(LOSS_REASONS).toContain(r);
+      expect(LOSS_REASON_LABEL[r]).toBeTruthy();
+    }
+    expect(LOSS_REASONS_A_ELEGIR).toContain("flete_caro");
   });
 });

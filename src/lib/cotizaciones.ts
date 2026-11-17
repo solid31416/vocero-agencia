@@ -398,9 +398,24 @@ export function esEtapaDeCotizacion(nombre: string): boolean {
   return n.includes("cotiz") && !/\b(pide|pidio|piden|solicit|quiere|interes)/.test(n);
 }
 
+/**
+ * ¿Es la etapa de «cotización aceptada» (el cliente dijo que sí y falta el
+ * anticipo)? La pone el CRM al «Marcar aceptada». Sin la palabra «anticipo»:
+ * esa es la del primer pago.
+ */
+export function esEtapaDeAceptada(nombre: string): boolean {
+  const n = normalizar(nombre);
+  return /\bacept/.test(n) && !n.includes("anticipo");
+}
+
 /** La etapa abierta de «cotización enviada» del Pipeline, si el negocio tiene una. */
 export function etapaDeCotizacion<T extends { name: string; kind: string }>(etapas: readonly T[]): T | null {
-  return etapas.find((e) => e.kind === "open" && esEtapaDeCotizacion(e.name)) ?? null;
+  return etapas.find((e) => e.kind === "open" && esEtapaDeCotizacion(e.name) && !esEtapaDeAceptada(e.name)) ?? null;
+}
+
+/** La etapa abierta de «cotización aceptada» del Pipeline, si el negocio tiene una. */
+export function etapaDeAceptada<T extends { name: string; kind: string }>(etapas: readonly T[]): T | null {
+  return etapas.find((e) => e.kind === "open" && esEtapaDeAceptada(e.name)) ?? null;
 }
 
 export function productoPrincipal(partidas: readonly Pick<Partida, "concepto" | "cantidad" | "precio">[]): string {

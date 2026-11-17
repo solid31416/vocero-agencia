@@ -1,7 +1,7 @@
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { scoped } from "@/lib/db/tenant";
-import { etapaDeCotizacion } from "@/lib/cotizaciones";
+import { etapaDeAceptada, etapaDeCotizacion } from "@/lib/cotizaciones";
 import { publish } from "@/server/events/bus";
 import { moveLeadToStage } from "@/server/leads/stage-history";
 
@@ -50,12 +50,32 @@ export async function montoAlTrato(input: {
  * si ya iba más adelante, ganado o perdido, se queda donde está. Esa etapa
  * la pone el CRM, no la IA (ver `src/server/bot/stage.ts`). Nunca truena.
  */
-export async function moverACotizacion(input: {
+export async function moverACotizacion(input: EntradaMover): Promise<string | null> {
+  return moverHaciaAdelante(input, etapaDeCotizacion);
+}
+
+/**
+ * Al «Marcar aceptada», el trato pasa a «Cotización aceptada» (si el negocio
+ * tiene esa etapa): aceptó y falta el anticipo. Mismas reglas: solo hacia
+ * adelante y desde una etapa abierta. Nunca truena.
+ */
+export async function moverAAceptada(input: EntradaMover): Promise<string | null> {
+  return moverHaciaAdelante(input, etapaDeAceptada);
+}
+
+type EntradaMover = {
   organizationId: string;
   contactId: string | null;
   conversationId: string | null;
   actorUserId: string | null;
-}): Promise<string | null> {
+};
+
+type Etapa = { id: string; name: string; kind: "open" | "won" | "lost"; position: number };
+
+async function moverHaciaAdelante(
+  input: EntradaMover,
+  elegir: (etapas: readonly Etapa[]) => Etapa | null
+): Promise<string | null> {
   if (!input.contactId) return null;
   try {
     const db = getDb();
@@ -69,7 +89,7 @@ export async function moverACotizacion(input: {
       .from(schema.pipelineStage)
       .where(scoped(schema.pipelineStage.organizationId, input.organizationId))
       .orderBy(asc(schema.pipelineStage.position));
-    const destino = etapaDeCotizacion(etapas);
+    const destino = elegir(etapas);
     if (!destino) return null;
     const [lead] = await db
       .select({ id: schema.lead.id, stageId: schema.lead.stageId })

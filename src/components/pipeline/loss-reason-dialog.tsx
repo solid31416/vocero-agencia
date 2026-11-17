@@ -1,11 +1,11 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { LOSS_REASON_LABEL, type LossReason } from "@/lib/types";
+import { LOSS_REASON_LABEL, LOSS_REASONS_A_ELEGIR, type LossReason } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
-const REASONS = Object.keys(LOSS_REASON_LABEL) as LossReason[];
+const REASONS = LOSS_REASONS_A_ELEGIR;
 
 /**
  * Motivo de pérdida. Se pide al ENTRAR a la etapa perdida y es
