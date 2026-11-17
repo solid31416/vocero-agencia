@@ -38,11 +38,37 @@ import { QuickReplyMenu } from "./quick-reply-menu";
 import { guardarBorrador, leerBorrador } from "@/lib/borradores";
 import {
   aplicarRespuesta,
+  datosDeVenta,
   filtrarRespuestas,
   rellenarVariables,
   tokenRapido,
+  usaVariablesDeVenta,
+  type DatosDeVenta,
   type RespuestaRapida,
 } from "@/lib/respuestas-rapidas";
+import { formatoDinero, type CotizacionDto } from "@/lib/cotizaciones";
+import { fechaLegible, type PedidoDto } from "@/lib/pedidos";
+
+/**
+ * Módulo de la agencia — lo de la venta para `{folio}`, `{saldo}`… Solo se
+ * pide cuando la respuesta lo usa; si un módulo está apagado (404) o falla,
+ * esas variables se quedan escritas para llenarlas a mano.
+ */
+async function leerDatosDeVenta(conversationId: string): Promise<DatosDeVenta> {
+  const q = encodeURIComponent(conversationId);
+  const [c, p] = await Promise.all([
+    fetch(`/api/cotizaciones?conversationId=${q}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ cotizaciones?: CotizacionDto[] }>) : null))
+      .catch(() => null),
+    fetch(`/api/pedidos?conversationId=${q}`)
+      .then((r) => (r.ok ? (r.json() as Promise<{ pedidos?: PedidoDto[] }>) : null))
+      .catch(() => null),
+  ]);
+  return datosDeVenta(c?.cotizaciones ?? [], p?.pedidos ?? [], {
+    dinero: (n) => formatoDinero(n),
+    fecha: (iso) => fechaLegible(iso),
+  });
+}
 
 export function Composer({
   conversation,
@@ -225,11 +251,14 @@ export function Composer({
   }
 
   /** 049 — Cambia el `/atajo` por la respuesta (con `{nombre}` relleno); no envía. */
-  function elegirRespuesta(r: RespuestaRapida) {
+  async function elegirRespuesta(r: RespuestaRapida) {
     const el = taRef.current;
     if (!el || !token) return;
-    const insercion = rellenarVariables(r.texto, conversation.contact.name);
-    const next = aplicarRespuesta(text, token.inicio, el.selectionStart, insercion);
+    const inicio = token.inicio;
+    const cursor = el.selectionStart;
+    const datos = usaVariablesDeVenta(r.texto) ? await leerDatosDeVenta(conversation.id) : {};
+    const insercion = rellenarVariables(r.texto, conversation.contact.name, datos);
+    const next = aplicarRespuesta(text, inicio, cursor, insercion);
     emojiCaret.current = next.cursor;
     setText(next.texto);
     setToken(null);
@@ -801,7 +830,7 @@ export function Composer({
               if ((e.key === "Enter" && !e.shiftKey) || e.key === "Tab") {
                 e.preventDefault();
                 const elegida = opcionesRapidas[activa];
-                if (elegida) elegirRespuesta(elegida);
+                if (elegida) void elegirRespuesta(elegida);
                 else setCerradoEn(token!.inicio);
                 return;
               }

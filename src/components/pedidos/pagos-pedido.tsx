@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Trash2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,28 @@ export function PagosPedido({
   const [cobrar, setCobrar] = useState(pedido.cobrarSaldoEl ?? "");
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  // Módulo de la agencia: el anticipo de la cotización de la que salió el
+  // pedido, para registrarlo con un toque; y cuándo cobrar el saldo.
+  const [anticipoCot, setAnticipoCot] = useState<number | null>(null);
+  const [cobrarAlRegistrar, setCobrarAlRegistrar] = useState(pedido.cobrarSaldoEl ?? "");
+  const esPrimero = pagos.length === 0;
+  useEffect(() => {
+    if (!abierto || !esPrimero || !pedido.cotizacionId) return;
+    let vivo = true;
+    void fetch(`/api/cotizaciones/${pedido.cotizacionId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { cotizacion?: { totales?: { anticipo?: number } } } | null) => {
+        const a = d?.cotizacion?.totales?.anticipo ?? 0;
+        if (vivo && a > 0) {
+          setAnticipoCot(a);
+          setMonto((m) => (m > 0 ? m : a));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [abierto, esPrimero, pedido.cotizacionId]);
 
   const tras = resumenPagos(pedido.monto, [...pagos, { monto }]);
   const textoBase = mensajeDePago({
@@ -51,6 +73,7 @@ export function PagosPedido({
     liquidado: tras.liquidado,
   });
   const texto = mensaje ?? textoBase;
+  const quedaSaldo = tras.saldo !== null && tras.saldo > 0;
   const avance = pedido.monto && pedido.monto > 0 ? Math.min(100, (pedido.pagado / pedido.monto) * 100) : 0;
 
   async function registrar() {
@@ -60,7 +83,16 @@ export function PagosPedido({
     const res = await fetch(`/api/pedidos/${pedido.id}/pagos`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ monto, fecha: fecha || null, nota, avisar, ...(avisar ? { mensaje: texto } : {}) }),
+      body: JSON.stringify({
+        monto,
+        fecha: fecha || null,
+        nota,
+        avisar,
+        ...(avisar ? { mensaje: texto } : {}),
+        ...(quedaSaldo && cobrarAlRegistrar !== (pedido.cobrarSaldoEl ?? "")
+          ? { cobrarSaldoEl: cobrarAlRegistrar || null }
+          : {}),
+      }),
     }).catch(() => null);
     setOcupado(false);
     const d = (await res?.json().catch(() => null)) as {
@@ -71,6 +103,8 @@ export function PagosPedido({
     } | null;
     if (!res?.ok || !d?.pedido) return setAviso({ ok: false, texto: d?.error?.message ?? "No se pudo registrar el pago" });
     const partes = [`Pago de ${formatoDinero(monto)} registrado.`];
+    if (quedaSaldo && cobrarAlRegistrar) partes.push(`Te recordamos cobrar el saldo el ${fechaLegible(cobrarAlRegistrar)}.`);
+    setCobrar(d.pedido.cobrarSaldoEl ?? "");
     if (d.etapaEmbudo) partes.push(`El cliente pasó a «${d.etapaEmbudo}».`);
     const fallo = d.aviso && d.aviso.aviso !== "texto" && d.aviso.aviso !== "plantilla";
     if (avisar && fallo) partes.push(`No se le avisó: ${d.aviso?.detalle ?? "sin detalle"}.`);
@@ -199,10 +233,25 @@ export function PagosPedido({
                   setMensaje(null);
                 }}
               />
+              {esPrimero && anticipoCot !== null && anticipoCot !== monto && (
+                <button
+                  type="button"
+                  className="block text-xs text-brand-text hover:underline"
+                  onClick={() => {
+                    setMonto(anticipoCot);
+                    setMensaje(null);
+                  }}
+                >
+                  Anticipo de la cotización ({formatoDinero(anticipoCot)})
+                </button>
+              )}
+              {esPrimero && anticipoCot !== null && anticipoCot === monto && (
+                <p className="text-xs text-text-3">Es el anticipo de la cotización.</p>
+              )}
               {pedido.saldo !== null && pedido.saldo > 0 && (
                 <button
                   type="button"
-                  className="text-xs text-brand-text hover:underline"
+                  className="block text-xs text-brand-text hover:underline"
                   onClick={() => {
                     setMonto(pedido.saldo ?? 0);
                     setMensaje(null);
@@ -217,6 +266,21 @@ export function PagosPedido({
               <Input id={`pago-fecha-${pedido.id}`} type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
             </div>
           </div>
+          {quedaSaldo && (
+            <div className="space-y-1">
+              <Label htmlFor={`pago-cobrar-${pedido.id}`}>
+                ¿Cuándo le cobramos el saldo de {formatoDinero(tras.saldo ?? 0)}?
+              </Label>
+              <Input
+                id={`pago-cobrar-${pedido.id}`}
+                type="date"
+                value={cobrarAlRegistrar}
+                onChange={(e) => setCobrarAlRegistrar(e.target.value)}
+                className="w-auto"
+              />
+              <p className="text-xs text-text-3">Ese día te avisamos y se le recuerda al cliente. Puedes dejarlo vacío.</p>
+            </div>
+          )}
           <Input
             value={nota}
             maxLength={200}

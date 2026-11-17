@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   normalizarAtajo,
+  RESPUESTAS_DE_ARRANQUE,
   TEXTO_MAX,
+  VARIABLES_DE_VENTA,
   type RespuestaRapida,
 } from "@/lib/respuestas-rapidas";
 
@@ -73,6 +75,26 @@ export function QuickRepliesClient() {
 
   const atajoFinal = normalizarAtajo(atajo);
 
+  // Módulo de la agencia: las respuestas de arranque que todavía no existen.
+  const faltan = RESPUESTAS_DE_ARRANQUE.filter((e) => !(lista ?? []).some((r) => r.atajo === e.atajo));
+  const [cargando, setCargando] = useState(false);
+  async function cargarEjemplos() {
+    setCargando(true);
+    setError(null);
+    let fallidas = 0;
+    for (const e of faltan) {
+      const res = await fetch("/api/quick-replies", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(e),
+      }).catch(() => null);
+      if (!res?.ok) fallidas++;
+    }
+    setCargando(false);
+    if (fallidas > 0) setError(`No se pudieron agregar ${fallidas} de los ejemplos.`);
+    void cargar();
+  }
+
   return (
     <div className="max-w-3xl space-y-6">
       <Card>
@@ -86,6 +108,16 @@ export function QuickRepliesClient() {
             <span className="font-mono">{"{nombre}"}</span> se cambia por el primer
             nombre del cliente. Solo dentro de la ventana de 24 h: para reabrirla
             están las plantillas.
+            <span className="mt-2 block">
+              También se llenan solas con lo de la venta de ese cliente:{" "}
+              {VARIABLES_DE_VENTA.map((v, i) => (
+                <span key={v.clave}>
+                  {i > 0 && ", "}
+                  <span className="font-mono">{`{${v.clave}}`}</span> ({v.que})
+                </span>
+              ))}
+              . Si el dato no existe, la variable se queda escrita para que la completes.
+            </span>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -117,10 +149,24 @@ export function QuickRepliesClient() {
           )}
 
           {puedeEditar && editando === null && (
-            <Button variant="outline" size="sm" onClick={() => abrir(null)}>
-              <Plus className="h-4 w-4" /> Nueva respuesta
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => abrir(null)}>
+                <Plus className="h-4 w-4" /> Nueva respuesta
+              </Button>
+              {lista !== null && faltan.length > 0 && (
+                <Button variant="outline" size="sm" disabled={cargando} onClick={() => void cargarEjemplos()}>
+                  <Sparkles className="h-4 w-4" />{" "}
+                  {cargando ? "Agregando…" : `Cargar ${faltan.length} de ejemplo`}
+                </Button>
+              )}
+            </div>
           )}
+          {puedeEditar && lista !== null && faltan.length > 0 && editando === null && (
+            <p className="text-xs text-text-3">
+              Ejemplos: /{faltan.map((e) => e.atajo).join(", /")}. Después cambia lo que dice [X] por tus datos.
+            </p>
+          )}
+          {error && editando === null && <p className="text-sm text-danger-text">{error}</p>}
 
           {editando !== null && (
             <div className="space-y-3 rounded-md border bg-subtle p-3" data-testid="form-respuesta">

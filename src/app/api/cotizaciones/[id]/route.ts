@@ -1,13 +1,22 @@
 import { z } from "zod";
 import { apiError, parseBody, withAuth } from "@/lib/api";
 import { cotizacionesEnabled } from "@/server/cotizaciones/flag";
-import { aDto, borrarBorrador, cambiarEstado } from "@/server/cotizaciones/store";
+import { aDto, borrarBorrador, cambiarEstado, leerCotizacion } from "@/server/cotizaciones/store";
 
 export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ id: string }> };
 
 const patchSchema = z.object({ estado: z.enum(["enviada", "aceptada", "rechazada"]) });
+
+/** Una cotización (p. ej. para proponer su anticipo al registrar el primer pago). */
+export const GET = withAuth(async (session, _req: Request, ctx: Params) => {
+  if (!cotizacionesEnabled()) return new Response(null, { status: 404 });
+  const { id } = await ctx.params;
+  const f = await leerCotizacion(session.organizationId, id);
+  if (!f) return apiError(404, "no_existe", "Cotización no encontrada");
+  return Response.json({ cotizacion: aDto(f) });
+});
 
 /** Marca una cotización ya enviada como aceptada, rechazada (o de vuelta a enviada). */
 export const PATCH = withAuth(async (session, req: Request, ctx: Params) => {

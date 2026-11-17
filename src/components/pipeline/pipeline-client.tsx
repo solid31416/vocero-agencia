@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   DndContext,
@@ -58,6 +58,27 @@ export function PipelineClient() {
    * dentro, en vez de enseñar una copia que envejece.
    */
   const [abiertoId, setAbiertoId] = useState<string | null>(null);
+  /** Módulo de la agencia: el tablero, para llevarlo a una etapa desde los chips. */
+  const tableroRef = useRef<HTMLDivElement>(null);
+  const yaCentrado = useRef(false);
+
+  const irAEtapa = useCallback((stageId: string, suave = true) => {
+    const caja = tableroRef.current;
+    const col = caja?.querySelector<HTMLElement>(`[data-etapa="${CSS.escape(stageId)}"]`);
+    if (!caja || !col) return;
+    const izq = caja.scrollLeft + col.getBoundingClientRect().left - caja.getBoundingClientRect().left - 12;
+    caja.scrollTo({ left: Math.max(0, izq), behavior: suave ? "smooth" : "auto" });
+  }, []);
+
+  // En el teléfono se ve una columna a la vez: al abrir, en vez de la primera
+  // (casi siempre «Nuevo», vacía) se muestra la primera etapa que tiene gente.
+  useEffect(() => {
+    if (yaCentrado.current || leads.length === 0 || stages.length === 0) return;
+    yaCentrado.current = true;
+    if (typeof window === "undefined" || window.innerWidth >= 640) return;
+    const primera = stages.find((s) => leads.some((l) => l.stageId === s.id));
+    if (primera && primera.id !== stages[0]?.id) requestAnimationFrame(() => irAEtapa(primera.id, false));
+  }, [leads, stages, irAEtapa]);
   const abierto = leads.find((l) => l.id === abiertoId) ?? null;
 
   const sensors = useSensors(
@@ -179,9 +200,36 @@ export function PipelineClient() {
         </Button>
       </header>
 
+      {/* Módulo de la agencia: atajo a cada etapa con cuántos hay. En el
+          teléfono es la forma de encontrar a un cliente sin deslizar
+          columna por columna. */}
+      {stages.length > 0 && (
+        <nav
+          aria-label="Ir a una etapa"
+          className="flex flex-wrap gap-1.5 border-b px-3 py-2 sm:hidden"
+        >
+          {stages.map((s) => {
+            const n = leads.filter((l) => l.stageId === s.id).length;
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => irAEtapa(s.id)}
+                className={cn(
+                  "rounded-full border px-2.5 py-1 text-xs",
+                  n > 0 ? "border-border-strong bg-background font-medium" : "border-transparent text-text-3"
+                )}
+              >
+                {s.name} <span className="font-mono">{n}</span>
+              </button>
+            );
+          })}
+        </nav>
+      )}
+
       {/* El tablero se arrastra en horizontal; en el teléfono cada columna
           se detiene en su sitio (snap) para no quedar a medio camino. */}
-      <div className="flex-1 snap-x snap-mandatory overflow-x-auto p-3 sm:snap-none sm:p-4">
+      <div ref={tableroRef} className="flex-1 snap-x snap-mandatory overflow-x-auto p-3 sm:snap-none sm:p-4">
         <DndContext
           sensors={sensors}
           onDragStart={onDragStart}
@@ -306,6 +354,7 @@ function StageColumn({
   return (
     <div
       ref={setNodeRef}
+      data-etapa={stage.id}
       className={cn(
         "flex h-full w-64 shrink-0 snap-start flex-col rounded-lg border border-border-strong bg-subtle transition-[box-shadow,border-color]",
         isOver && "border-brand ring-[3px] ring-brand-soft"

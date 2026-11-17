@@ -86,11 +86,17 @@ export function TimeGrid({
   const rangeKey = `${days[0]}|${days.length}`;
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el || !ready || scrolledFor.current === rangeKey) return;
+    // Sin alto todavía (montado oculto), el scroll no aplica: se reintenta.
+    if (!el || !ready || scrolledFor.current === rangeKey || el.clientHeight === 0) return;
     scrolledFor.current = rangeKey;
+    // Módulo de la agencia: un bloqueo o una cita cancelada de madrugada no
+    // deben abrir el día a la 1:00; solo las citas vivas adelantan la hora.
     const starts = [
       ...days.flatMap((d) => workingBands(weeklyHours, d).map((b) => b.startMin)),
-      ...[...byDay.values()].flat().map((p) => p.startMin),
+      ...[...byDay.values()]
+        .flat()
+        .filter((p) => p.booking.kind !== "block" && p.booking.status !== "cancelada")
+        .map((p) => p.startMin),
     ];
     const target = starts.length > 0 ? Math.min(...starts) : DEFAULT_SCROLL_MIN;
     el.scrollTop = Math.max(0, ((target - 45) / 60) * HOUR_PX);

@@ -549,7 +549,7 @@ export function InboxClient({
                   con su nombre: así el nombre del cliente se ve completo (antes,
                   con 5 botones junto al nombre, en celular solo se veía «S.»). */}
               <div
-                className="-mx-1 flex basis-full items-center gap-1.5 overflow-x-auto px-1 pb-0.5 pt-1 [scrollbar-width:none]"
+                className="flex basis-full flex-wrap items-center gap-1.5 pb-0.5 pt-1"
                 data-acciones-hilo
               >
                 {/* La IA de esta conversación, a la mano. */}

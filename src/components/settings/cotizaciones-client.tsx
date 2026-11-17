@@ -375,6 +375,26 @@ export function CotizacionesClient() {
                 </p>
               </div>
               <div className="space-y-1.5">
+                <Label htmlFor="cot-aceptar">Cómo aceptar (sale resaltado en el PDF)</Label>
+                <Textarea id="cot-aceptar" rows={2} maxLength={300} value={config.comoAceptar} disabled={!editable}
+                  placeholder="Para apartar tu pedido, responde «SÍ» por WhatsApp o paga el anticipo de {anticipo}."
+                  onChange={(e) => cambiar({ comoAceptar: e.target.value })} />
+                <p className="text-xs text-muted-foreground">
+                  Usa <code>{"{anticipo}"}</code>, <code>{"{total}"}</code> y <code>{"{folio}"}</code>. Déjalo
+                  vacío si no quieres el recuadro.
+                </p>
+              </div>
+              <div className="flex items-start gap-3">
+                <Switch checked={config.fotosEnPdf} onCheckedChange={(v) => cambiar({ fotosEnPdf: v })}
+                  label="Poner la foto de cada modelo" disabled={!editable} />
+                <span className="text-sm">
+                  Poner la foto de cada modelo
+                  <span className="block text-xs text-muted-foreground">
+                    Toma de la Biblioteca la foto (JPG o PNG) cuyo título trae el nombre del modelo. Hasta 3.
+                  </span>
+                </span>
+              </div>
+              <div className="space-y-1.5">
                 <Label htmlFor="cot-condiciones">Otras condiciones (salen al final del PDF)</Label>
                 <Textarea id="cot-condiciones" rows={3} maxLength={1500} value={config.condiciones} disabled={!editable}
                   placeholder="Tiempo de entrega, garantía, qué incluye la instalación…"

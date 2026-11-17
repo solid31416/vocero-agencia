@@ -15,6 +15,7 @@ import { textoDeMensaje } from "@/lib/resumen-traspaso";
 import { businessTimezone } from "@/server/analytics/period";
 import { getBranding } from "@/server/branding";
 import { SendError, sendMediaMessage } from "@/server/inbox/send";
+import { fotosParaCotizacion } from "./fotos";
 import { generarPdfCotizacion, nombreArchivo } from "./pdf";
 import { leerConfig, leerCotizacion, leerLogo, marcarEnviada } from "./store";
 import { montoAlTrato, moverACotizacion } from "./embudo";
@@ -23,10 +24,16 @@ type Fila = NonNullable<Awaited<ReturnType<typeof leerCotizacion>>>;
 
 /** El PDF de una cotización guardada (borrador = vista previa con vigencia desde hoy). */
 export async function pdfDeCotizacion(organizationId: string, fila: Fila): Promise<{ data: Buffer; nombre: string }> {
-  const [branding, logo, zona] = await Promise.all([
+  // Las fotos salen de los productos de hoy; las cotizaciones de antes de la
+  // opción (sin `fotosEnPdf`) también las llevan.
+  const conFotos = fila.condiciones.fotosEnPdf !== false;
+  const [branding, logo, zona, fotos] = await Promise.all([
     getBranding(organizationId),
     leerLogo(organizationId),
     businessTimezone(organizationId),
+    conFotos
+      ? leerConfig(organizationId).then((c) => fotosParaCotizacion(organizationId, fila.partidas, c.productos))
+      : Promise.resolve([]),
   ]);
   const fecha = fila.enviadaEn ?? new Date();
   const venceEn = fila.venceEn ?? new Date(fecha.getTime() + fila.condiciones.vigenciaDias * 86_400_000);
@@ -45,6 +52,7 @@ export async function pdfDeCotizacion(organizationId: string, fila: Fila): Promi
     acento: branding.accent,
     logo,
     zona,
+    fotos,
   });
   return { data, nombre: nombreArchivo(folio, fila.condiciones.negocio.nombre || branding.name) };
 }

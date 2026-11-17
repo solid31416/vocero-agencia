@@ -161,6 +161,8 @@ export const pagoInputSchema = z.object({
   avisar: z.boolean().default(false),
   /** El texto del aviso, si quien registra lo editó. */
   mensaje: z.string().trim().max(MAX_MENSAJE).optional(),
+  /** Módulo de la agencia: cuándo cobrar el saldo, pedido al registrar el anticipo. */
+  cobrarSaldoEl: fechaSchema.optional(),
 });
 export type PagoInput = z.infer<typeof pagoInputSchema>;
 
@@ -370,7 +372,7 @@ export function resumenParaFicha(p: {
   fechaEstimada: string | null;
   esUltima: boolean;
   /** Anticipo y saldo, ya con formato de dinero. */
-  pagos?: { pagado: string; saldo: string | null; liquidado: boolean } | null;
+  pagos?: { pagado: string; saldo: string | null; liquidado: boolean; cobrarSaldoEl?: string | null } | null;
 }): string {
   const partes = [p.folio, p.concepto.slice(0, 120), `estado: ${p.etapaNombre}`];
   if (p.fechaEstimada && !p.esUltima) partes.push(`entrega estimada: ${fechaLegible(p.fechaEstimada)}`);
@@ -378,7 +380,9 @@ export function resumenParaFicha(p: {
     partes.push(
       p.pagos.liquidado
         ? `pagado: ${p.pagos.pagado} (liquidado)`
-        : `pagado: ${p.pagos.pagado}${p.pagos.saldo ? `, falta: ${p.pagos.saldo}` : ""}`
+        : `pagado: ${p.pagos.pagado}${p.pagos.saldo ? `, falta: ${p.pagos.saldo}` : ""}${
+            p.pagos.saldo && p.pagos.cobrarSaldoEl ? `, el saldo se paga el ${fechaLegible(p.pagos.cobrarSaldoEl)}` : ""
+          }`
     );
   }
   return partes.join(" · ");

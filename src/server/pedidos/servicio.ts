@@ -98,6 +98,7 @@ async function anotarEnFicha(organizationId: string, config: ConfigPedidos, f: F
                 pagado: formatoDinero(r.pagado),
                 saldo: r.saldo !== null && r.saldo > 0 ? formatoDinero(r.saldo) : null,
                 liquidado: r.liquidado,
+                cobrarSaldoEl: f.cobrarSaldoEl ?? null,
               }
             : null,
       }),
@@ -288,7 +289,10 @@ export async function registrarPago(
     creadoEn: new Date().toISOString(),
   };
   const pagos = [...previos, pago];
-  const final = await actualizarPedido(organizationId, id, { pagos });
+  const final = await actualizarPedido(organizationId, id, {
+    pagos,
+    ...(datos.cobrarSaldoEl !== undefined ? { cobrarSaldoEl: datos.cobrarSaldoEl } : {}),
+  });
   if (!final) return { ok: false, status: 404, codigo: "not_found", detalle: "Pedido no encontrado" };
   const config = await leerConfig(organizationId);
   await anotarEnFicha(organizationId, config, final);

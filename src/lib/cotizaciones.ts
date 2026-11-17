@@ -76,6 +76,19 @@ export function renglonesDePago(m: MetodoPago): string[] {
   return r;
 }
 
+/** Módulo de la agencia: el recuadro del PDF que le dice al cliente cómo cerrar. */
+export const TEXTO_ACEPTAR_POR_DEFECTO =
+  "Para apartar tu pedido, responde «SÍ» a este mensaje por WhatsApp o paga el anticipo de {anticipo}.";
+
+/** {anticipo} (o el total si no hay anticipo), {total} y {folio}. */
+export function textoComoAceptar(plantilla: string, v: { anticipo: string; total: string; folio: string }): string {
+  return plantilla
+    .replace(/\{anticipo\}/g, v.anticipo)
+    .replace(/\{total\}/g, v.total)
+    .replace(/\{folio\}/g, v.folio)
+    .trim();
+}
+
 export const negocioSchema = z.object({
   nombre: z.string().trim().max(120).default(""),
   rfc: z.string().trim().max(20).default(""),
@@ -119,6 +132,10 @@ export const configSchema = z.object({
   preciosConIva: z.boolean().default(false),
   anticipoPct: z.coerce.number().min(0).max(100).default(50),
   formaPago: z.string().trim().max(300).default("Transferencia o depósito bancario."),
+  /** Módulo de la agencia: el recuadro «cómo aceptar» del PDF (vacío = no sale). */
+  comoAceptar: z.string().trim().max(300).default(TEXTO_ACEPTAR_POR_DEFECTO),
+  /** Módulo de la agencia: fotos de los modelos cotizados, de la Biblioteca. */
+  fotosEnPdf: z.boolean().default(true),
   /** Módulo de la agencia: las cuentas y formas de abono, para «Cómo pagar» del PDF. */
   metodosPago: z.array(metodoPagoSchema).max(MAX_METODOS_PAGO, `Máximo ${MAX_METODOS_PAGO} formas de pago`).default([]),
   condiciones: z.string().trim().max(1500).default(""),

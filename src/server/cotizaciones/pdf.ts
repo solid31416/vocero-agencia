@@ -3,6 +3,7 @@ import {
   fechaLarga,
   formatoDinero,
   renglonesDePago,
+  textoComoAceptar,
   type ConfigCotizaciones,
   type Partida,
   type Totales,
@@ -30,6 +31,8 @@ export type DatosPdf = {
   acento: string;
   logo: { data: Buffer; mime: string } | null;
   zona?: string;
+  /** Módulo de la agencia: fotos de los modelos (JPG o PNG), hasta 3. */
+  fotos?: { data: Buffer; mime: string; titulo: string }[];
 };
 
 const ANCHO = 612; // carta, puntos
@@ -270,6 +273,58 @@ export async function generarPdfCotizacion(d: DatosPdf): Promise<Buffer> {
       texto(valor, xEtiq, y, { t: 9.5, alinear: "der", ancho: 224 });
       y -= 16;
     }
+  }
+
+  // ---------------------------------------------------------------- cómo aceptar
+  // Módulo de la agencia: lo que tiene que hacer el cliente para cerrar, a la
+  // vista. Las cotizaciones guardadas antes no lo traen.
+  const aceptar = (d.condiciones.comoAceptar ?? "").trim();
+  if (aceptar) {
+    const llamado = textoComoAceptar(aceptar, {
+      anticipo: dinero(t.anticipo > 0 ? t.anticipo : t.total),
+      total: dinero(t.total),
+      folio: d.folio,
+    });
+    const rr = partirRenglones(llamado, negrita, 9.5, UTIL - 28);
+    const alto = rr.length * 13 + 14;
+    y -= 14;
+    asegurar(alto + 6);
+    const tinte = rgb(1 - (1 - acento.red) * 0.1, 1 - (1 - acento.green) * 0.1, 1 - (1 - acento.blue) * 0.1);
+    pagina.drawRectangle({ x: MARGEN, y: y - alto + 13, width: UTIL, height: alto, color: tinte });
+    pagina.drawRectangle({ x: MARGEN, y: y - alto + 13, width: 3, height: alto, color: acento });
+    rr.forEach((r, i) => texto(r, MARGEN + 14, y - i * 13, { f: negrita, t: 9.5, c: tinta }));
+    y -= alto;
+  }
+
+  // ---------------------------------------------------------------- fotos
+  // Módulo de la agencia: cómo se ve lo que se cotizó (de la Biblioteca).
+  const fotos: { img: PDFImage; titulo: string }[] = [];
+  for (const f of (d.fotos ?? []).slice(0, 3)) {
+    try {
+      const img = f.mime === "image/png" ? await pdf.embedPng(f.data) : await pdf.embedJpg(f.data);
+      fotos.push({ img, titulo: f.titulo });
+    } catch {
+      // una foto dañada no impide la cotización
+    }
+  }
+  if (fotos.length > 0) {
+    const hueco = 12;
+    const anchoFoto = (UTIL - hueco * 2) / 3;
+    const altoMax = 120;
+    y -= 16;
+    asegurar(altoMax + 34);
+    texto("Así se ve", MARGEN, y, { f: negrita, t: 10, c: acento });
+    y -= 10;
+    fotos.forEach(({ img, titulo }, i) => {
+      const escala = Math.min(anchoFoto / img.width, altoMax / img.height);
+      const w = img.width * escala;
+      const h = img.height * escala;
+      const x = MARGEN + i * (anchoFoto + hueco);
+      pagina.drawImage(img, { x: x + (anchoFoto - w) / 2, y: y - altoMax + (altoMax - h) / 2, width: w, height: h });
+      const pie = partirRenglones(titulo, normal, 8, anchoFoto)[0] ?? "";
+      texto(pie, x, y - altoMax - 12, { t: 8, c: gris });
+    });
+    y -= altoMax + 22;
   }
 
   // ---------------------------------------------------------------- cómo pagar
