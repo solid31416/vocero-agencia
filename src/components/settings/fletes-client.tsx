@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, Copy, Globe, Mail, MessageCircle, Phone, Plus, Star, Trash2, Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { confirmar } from "@/components/ui/confirmar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -584,14 +585,14 @@ function Transportistas({
   const cambiarT = (i: number, p: Partial<Transportista>) =>
     cambiar({ transportistas: f.transportistas.map((t, j) => (j === i ? { ...t, ...p } : t)) });
 
-  function quitar(i: number) {
+  async function quitar(i: number) {
     const t = f.transportistas[i];
     if (!t) return;
     const suyas = f.tarifas.filter((x) => x.transportistaId === t.id).length;
     const pregunta = suyas
       ? `¿Quitar a ${t.nombre || "esta transportista"}? También se quitan sus ${suyas} tarifa(s). Si solo dejó de trabajar contigo, mejor pausarla.`
       : `¿Quitar a ${t.nombre || "esta transportista"}?`;
-    if (!window.confirm(pregunta)) return;
+    if (!(await confirmar(pregunta))) return;
     cambiar({
       transportistas: f.transportistas.filter((_, j) => j !== i),
       tarifas: f.tarifas.filter((x) => x.transportistaId !== t.id),
@@ -708,7 +709,7 @@ function Transportistas({
                     </a>
                   )}
                   {editable && (
-                    <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => quitar(i)} aria-label="Quitar transportista">
+                    <Button type="button" variant="ghost" size="sm" className="ml-auto" onClick={() => void quitar(i)} aria-label="Quitar transportista">
                       <Trash2 className="mr-1 h-4 w-4" aria-hidden /> Quitar
                     </Button>
                   )}

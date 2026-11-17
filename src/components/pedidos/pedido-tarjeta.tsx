@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Check, MessageSquare, MessageSquareOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { confirmar } from "@/components/ui/confirmar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -117,7 +118,8 @@ export function PedidoTarjeta({
   }
 
   async function borrar() {
-    if (!window.confirm(`¿Quitar el pedido ${pedido.folio}? Úsalo solo si se capturó por error.`)) return;
+    if (!(await confirmar(`¿Quitar el pedido ${pedido.folio}? Úsalo solo si se capturó por error.`, { accion: "Sí, quitar pedido" })))
+      return;
     const res = await fetch(`/api/pedidos/${pedido.id}`, { method: "DELETE" }).catch(() => null);
     if (res?.ok) onCambio(null);
     else setAviso({ ok: false, texto: "No se pudo quitar" });

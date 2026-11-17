@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Truck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { confirmar } from "@/components/ui/confirmar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,7 +95,7 @@ export function EnvioPedido({ pedido, onCambio }: { pedido: PedidoDto; onCambio:
   }
 
   async function quitar() {
-    if (!window.confirm("¿Quitar el envío de este pedido?")) return;
+    if (!(await confirmar("¿Quitar el envío de este pedido?", { accion: "Sí, quitar envío" }))) return;
     const res = await fetch(`/api/pedidos/${pedido.id}/envio`, { method: "DELETE" }).catch(() => null);
     const d = (await res?.json().catch(() => null)) as { pedido?: PedidoDto } | null;
     if (res?.ok && d?.pedido) {

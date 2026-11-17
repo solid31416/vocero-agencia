@@ -6,6 +6,7 @@ import { ChevronDown, FileText, ImageIcon, Pencil, Trash2, Upload, Video, X } fr
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { confirmar } from "@/components/ui/confirmar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -568,7 +569,7 @@ function Tarjeta({
   }
 
   async function borrar() {
-    if (!window.confirm(`¿Borrar «${archivo.titulo}»? El agente ya no lo podrá mandar.`)) return;
+    if (!(await confirmar(`¿Borrar «${archivo.titulo}»? El agente ya no lo podrá mandar.`, { accion: "Sí, borrar" }))) return;
     setOcupado(true);
     const res = await fetch(`/api/settings/biblioteca/${archivo.id}`, { method: "DELETE" }).catch(() => null);
     setOcupado(false);

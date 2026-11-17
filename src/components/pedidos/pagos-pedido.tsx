@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, Trash2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { confirmar } from "@/components/ui/confirmar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NumeroInput } from "@/components/ui/numero-input";
@@ -117,7 +118,7 @@ export function PagosPedido({
   }
 
   async function quitar(pagoId: string) {
-    if (!window.confirm("¿Quitar este pago? Úsalo solo si se capturó por error.")) return;
+    if (!(await confirmar("¿Quitar este pago? Úsalo solo si se capturó por error.", { accion: "Sí, quitar pago" }))) return;
     const res = await fetch(`/api/pedidos/${pedido.id}/pagos?pagoId=${encodeURIComponent(pagoId)}`, {
       method: "DELETE",
     }).catch(() => null);
