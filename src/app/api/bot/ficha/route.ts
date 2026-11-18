@@ -56,7 +56,10 @@ export async function PUT(req: Request) {
 
   // Módulo de la agencia: el cliente dijo su nombre (o el de su empresa).
   if (nombreRealEnabled()) {
-    const nombre = nombreDeLaFicha(body.data.ficha);
+    // Con la ficha YA mezclada: el nombre y la empresa pueden llegar en
+    // mensajes distintos. Solo si este cambio tocó alguno de los dos.
+    const toca = "nombre" in body.data.ficha || "empresa" in body.data.ficha;
+    const nombre = toca ? nombreDeLaFicha(result.ficha as Record<string, unknown>) : null;
     if (nombre) {
       const cambio = await ponerNombreReal(organizationId, rows[0].contactId, nombre).catch((err) => {
         console.warn(`[bot/ficha] no se pudo poner el nombre real: ${err}`);

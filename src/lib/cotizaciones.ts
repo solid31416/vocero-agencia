@@ -244,12 +244,21 @@ export function fechaLarga(d: Date, zona = "America/Mexico_City"): string {
   return new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long", year: "numeric", timeZone: zona }).format(d);
 }
 
+/**
+ * Módulo de la agencia — con quién se saluda: en «Domos Garza (Saúl)» es
+ * Saúl, no «Domos»; si no, el primer nombre.
+ */
+export function nombreParaSaludo(nombre: string): string {
+  const persona = /\(([^()]+)\)\s*$/.exec(nombre.trim())?.[1] ?? nombre;
+  return persona.trim().split(/\s+/)[0] ?? "";
+}
+
 /** El texto que acompaña al PDF, con sus variables llenas. */
 export function armarMensaje(
   plantilla: string,
   datos: { nombre: string; folio: string; total: string; vigencia: string }
 ): string {
-  const primerNombre = datos.nombre.trim().split(/\s+/)[0] ?? "";
+  const primerNombre = nombreParaSaludo(datos.nombre);
   return plantilla
     .replaceAll("{nombre}", primerNombre)
     .replaceAll("{folio}", datos.folio)
@@ -427,7 +436,7 @@ export function productoPrincipal(partidas: readonly Pick<Partida, "concepto" | 
 
 /** El texto del recordatorio con {nombre} {producto} {folio} llenos. */
 export function textoDeSeguimiento(plantilla: string, datos: { nombre: string; producto: string; folio: string }): string {
-  const primerNombre = datos.nombre.trim().split(/\s+/)[0] ?? "";
+  const primerNombre = nombreParaSaludo(datos.nombre);
   return plantilla
     .replaceAll("{nombre}", primerNombre)
     .replaceAll("{producto}", datos.producto)

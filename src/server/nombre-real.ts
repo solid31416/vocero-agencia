@@ -33,20 +33,32 @@ export function nombreUtil(valor: unknown): string | null {
 }
 
 /**
- * Cómo se llamará el contacto según lo que dijo el cliente: su nombre, y si
- * solo dio el de la empresa, el de la empresa. Null si no dijo ninguno.
+ * Empresa y persona juntas, como las quiere ver el dueño: «Domos Garza (Saúl)».
+ * Si falta una, la otra; si son la misma, una sola vez.
+ */
+export function empresaYPersona(empresa: string | null, persona: string | null): string | null {
+  if (!empresa) return persona;
+  if (!persona) return empresa;
+  if (persona.toLowerCase() === empresa.toLowerCase()) return persona;
+  // Si la persona ya trae la empresa («Domos Garza (Saúl)»), se deja como viene.
+  if (persona.toLowerCase().includes(empresa.toLowerCase())) return persona;
+  return `${empresa} (${persona})`.slice(0, MAX_NOMBRE);
+}
+
+/**
+ * Cómo se llamará el contacto según lo que dijo el cliente: «Empresa
+ * (Persona)» si habla por un negocio, si no su nombre, o solo la empresa.
+ * Null si no dijo ninguno.
  */
 export function nombreDeLaFicha(ficha: Record<string, unknown> | null | undefined): string | null {
   if (!ficha) return null;
-  return nombreUtil(ficha.nombre) ?? nombreUtil(ficha.empresa);
+  return empresaYPersona(nombreUtil(ficha.empresa), nombreUtil(ficha.nombre));
 }
 
-/** A nombre de quién va una cotización: «Saúl Garza — Domos del Norte», o lo que haya. */
+/** A nombre de quién va una cotización: «Domos del Norte (Saúl Garza)», o lo que haya. */
 export function aNombreDe(ficha: Record<string, unknown> | null | undefined, nombreContacto: string): string {
   const nombre = nombreUtil(ficha?.nombre) ?? nombreContacto.trim();
-  const empresa = nombreUtil(ficha?.empresa);
-  if (!empresa || empresa.toLowerCase() === nombre.toLowerCase()) return nombre.slice(0, MAX_NOMBRE);
-  return `${nombre} — ${empresa}`.slice(0, MAX_NOMBRE);
+  return (empresaYPersona(nombreUtil(ficha?.empresa), nombre) ?? nombre).slice(0, MAX_NOMBRE);
 }
 
 /**
