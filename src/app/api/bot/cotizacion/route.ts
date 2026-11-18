@@ -70,5 +70,6 @@ export async function POST(req: Request) {
     resumen: r.resumen,
     flete: r.flete,
     fleteMonto: r.fleteMonto,
+    ...(r.repetida ? { repetida: true } : {}),
   });
 }

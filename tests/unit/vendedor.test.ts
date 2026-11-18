@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { CONFIG_POR_DEFECTO, configSchema, productoSchema } from "@/lib/cotizaciones";
-import { piezasDelPedido, revisarPedidoDelAgente, VENDEDOR_POR_DEFECTO, vendedorSchema, type ConfigVendedor } from "@/lib/vendedor";
+import { esLaMismaCotizacion, piezasDelPedido, revisarPedidoDelAgente, VENDEDOR_POR_DEFECTO, vendedorSchema, type ConfigVendedor } from "@/lib/vendedor";
 
 /** Módulo de la agencia — el agente como vendedor: precios del catálogo y límites del dueño. */
 
@@ -105,5 +105,23 @@ describe("vendedor", () => {
       revisarPedidoDelAgente({ items: [{ productoId: "mini", cantidad: 2 }], descuentoPct: 0 }, productos, topeJusto, opciones, flete)
     ).toMatchObject({ codigo: "tope" });
     expect(piezasDelPedido({ items: [{ productoId: "mini", cantidad: 2 }, { productoId: "flete", cantidad: 3 }] }, productos)).toBe(2);
+  });
+});
+
+describe("Módulo de la agencia — no repetir la misma cotización", () => {
+  const mini = { productoId: "mini", concepto: "Domo Modelo Mini", descripcion: "", cantidad: 2, unidad: "pieza", precio: 125000 };
+  const previa = { partidas: [mini], descuentoPct: 0, contactoNombre: "Domos Garza (Saúl)" };
+
+  it("la misma (aunque cambie el orden o mayúsculas del nombre) es repetida", () => {
+    expect(esLaMismaCotizacion(previa, { partidas: [{ ...mini }], descuentoPct: 0, cliente: "domos garza (saúl)" })).toBe(true);
+    // Sin nombre nuevo, cuenta el de la que ya tiene.
+    expect(esLaMismaCotizacion(previa, { partidas: [mini], descuentoPct: 0, cliente: "" })).toBe(true);
+  });
+
+  it("si cambia algo, es otra cotización", () => {
+    expect(esLaMismaCotizacion(previa, { partidas: [{ ...mini, cantidad: 3 }], descuentoPct: 0, cliente: "Domos Garza (Saúl)" })).toBe(false);
+    expect(esLaMismaCotizacion(previa, { partidas: [{ ...mini, productoId: "estandar" }], descuentoPct: 0, cliente: "Domos Garza (Saúl)" })).toBe(false);
+    expect(esLaMismaCotizacion(previa, { partidas: [mini], descuentoPct: 5, cliente: "Domos Garza (Saúl)" })).toBe(false);
+    expect(esLaMismaCotizacion(previa, { partidas: [mini], descuentoPct: 0, cliente: "Laura Martínez" })).toBe(false);
   });
 });

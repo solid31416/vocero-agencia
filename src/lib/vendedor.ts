@@ -165,3 +165,28 @@ export function revisarPedidoDelAgente(
   }
   return { ok: true, partidas, descuentoPct, totales };
 }
+
+/**
+ * Módulo de la agencia — ¿lo que pide el agente es la MISMA cotización que
+ * ya se mandó? (mismas partidas, cantidades, precios, descuento y cliente).
+ * El modelo a veces la vuelve a pedir cuando el cliente contesta «sí,
+ * cotízalo» a una que ya tiene: armarla otra vez gasta un folio y le llega
+ * dos veces el PDF.
+ */
+export function esLaMismaCotizacion(
+  previa: { partidas: readonly Partida[]; descuentoPct: number; contactoNombre: string },
+  nueva: { partidas: readonly Partida[]; descuentoPct: number; cliente: string }
+): boolean {
+  const firma = (ps: readonly Partida[]) =>
+    ps
+      .filter((p) => p.cantidad > 0)
+      .map((p) => `${p.productoId ?? p.concepto.trim().toLowerCase()}|${p.cantidad}|${Math.round(p.precio * 100)}`)
+      .sort()
+      .join(";");
+  const nombre = (x: string) => x.replace(/\s+/g, " ").trim().toLowerCase();
+  return (
+    firma(previa.partidas) === firma(nueva.partidas) &&
+    Math.abs((previa.descuentoPct || 0) - (nueva.descuentoPct || 0)) < 0.001 &&
+    (!nueva.cliente.trim() || nombre(previa.contactoNombre) === nombre(nueva.cliente))
+  );
+}

@@ -5,7 +5,7 @@ import { getEnv } from "@/lib/env";
 import { scoped } from "@/lib/db/tenant";
 import { normalizeMx } from "@/lib/meta/client";
 import { conceptoDeFlete, destinosConTarifa, opcionesDeFlete } from "@/lib/fletes";
-import { piezasDelPedido, revisarPedidoDelAgente, type PedidoDelAgente } from "@/lib/vendedor";
+import { esLaMismaCotizacion, piezasDelPedido, revisarPedidoDelAgente, type PedidoDelAgente } from "@/lib/vendedor";
 import { avisarAlDueno } from "@/server/contador-mensajes/worker";
 import { publish } from "@/server/events/bus";
 import { crearNotaDelSistema } from "@/server/notas";
@@ -47,6 +47,8 @@ export type ResultadoAgente =
        */
       flete: EstadoFlete;
       fleteMonto: string | null;
+      /** Era la misma que ya le llegó: no se armó otra (ni se gastó folio). */
+      repetida?: boolean;
     }
   | { ok: false; status: number; codigo: string; detalle: string; paraPersona: boolean };
 
@@ -101,6 +103,27 @@ export async function cotizarDelAgente(input: {
   }
 
   const conversationId = pedido.conversationId;
+  // La misma que ya le llegó hace poco: se le recuerda esa, no se arma otra.
+  const previas = await listarCotizaciones(organizationId, { conversationId, limite: 5 });
+  const igual = previas.find(
+    (c) =>
+      c.estado === "enviada" &&
+      Date.now() - Date.parse(c.enviadaEn ?? c.createdAt) < 24 * 60 * 60 * 1000 &&
+      esLaMismaCotizacion(c, { partidas: revision.partidas, descuentoPct: revision.descuentoPct, cliente: pedido.cliente })
+  );
+  if (igual) {
+    return {
+      ok: true,
+      estado: "enviada",
+      folio: igual.folio,
+      total: formatoDinero(igual.totales.total, igual.moneda),
+      anticipo: formatoDinero(igual.totales.anticipo, igual.moneda),
+      resumen: igual.partidas.map((p) => `${p.cantidad} × ${p.concepto} (${formatoDinero(p.precio, igual.moneda)} c/u)`).join(", "),
+      flete: partidaFlete ? "incluido" : flete,
+      fleteMonto: partidaFlete ? formatoDinero(partidaFlete.precio, igual.moneda) : null,
+      repetida: true,
+    };
+  }
   const hechas = await cotizacionesDelAgenteDesde(
     organizationId,
     conversationId,

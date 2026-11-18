@@ -211,6 +211,10 @@
                     "fleteMonto": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "repetida": {
+                      "type": "boolean",
+                      "description": "Era la misma cotización que ya le llegó (menos de 24 h): no se armó otra ni se volvió a mandar; folio y total son los de esa."
                     }
                   }
                 }
